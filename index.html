@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#F59E0B">
+  <meta name="description" content="班級日誌小幫手 - 教師的得力助手">
+  <title>班級日誌小幫手</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  
+  <!-- React -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    html, body, #root {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      overscroll-behavior: none;
+    }
+    
+    body {
+      background: #FFFBEB;
+      color: #78350F;
+    }
+    
+    /* 背景網格 */
+    .bg-grid {
+      background-image: 
+        linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    
+    /* 按鈕 3D 效果 */
+    .btn-3d {
+      border: 3px solid #78350F;
+      border-radius: 16px;
+      box-shadow: 4px 4px 0px #78350F;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.1s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .btn-3d:active {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0px #78350F;
+    }
+    
+    .btn-3d:hover {
+      filter: brightness(1.05);
+    }
+    
+    /* 卡片樣式 */
+    .card {
+      background: white;
+      border: 3px solid #78350F;
+      border-radius: 20px;
+      box-shadow: 6px 6px 0px rgba(120, 53, 15, 0.15);
+    }
+    
+    /* 輸入框 */
+    .input-style {
+      width: 100%;
+      border: 3px solid #78350F;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 16px;
+      outline: none;
+      transition: box-shadow 0.2s;
+    }
+    
+    .input-style:focus {
+      box-shadow: 3px 3px 0px #78350F;
+    }
+    
+    /* 安全區域 */
+    .safe-bottom {
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+    
+    /* 動畫 */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    
+    .animate-pulse { animation: pulse 2s infinite; }
+    .animate-slideUp { animation: slideUp 0.5s ease-out; }
+    .animate-scaleIn { animation: scaleIn 0.3s ease-out; }
+    
+    /* 滾動條美化 */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #FEF3C7; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: #D97706; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #B45309; }
+    
+    /* Modal 背景 */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+    
+    /* 響應式隱藏 */
+    @media (max-width: 768px) {
+      .hide-mobile { display: none !important; }
+    }
+    @media (min-width: 769px) {
+      .hide-desktop { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+    // ============================================
+    // 圖標元件
+    // ============================================
+    const Icon = ({ name, size = 24, className = "" }) => {
+      const ref = useRef(null);
+      useEffect(() => {
+        if (ref.current) {
+          ref.current.innerHTML = '';
+          const icon = lucide.createElement(lucide.icons[name]);
+          icon.setAttribute('width', size);
+          icon.setAttribute('height', size);
+          if (className.includes('text-white')) {
+            icon.setAttribute('stroke', 'white');
+          }
+          ref.current.appendChild(icon);
+        }
+      }, [name, size, className]);
+      return <span ref={ref} style={{ display: 'inline-flex', alignItems: 'center' }} />;
+    };
+
+    // ============================================
+    // 響應式 Hook
+    // ============================================
+    const useDeviceType = () => {
+      const [device, setDevice] = useState(() => {
+        const w = window.innerWidth;
+        return w < 640 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop';
+      });
+      
+      useEffect(() => {
+        const handleResize = () => {
+          const w = window.innerWidth;
+          setDevice(w < 640 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop');
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+      }, []);
+      
+      return device;
+    };
+
+    // ============================================
+    // 常數
+    // ============================================
+    const PERIODS = [
+      { id: 'early', label: '早修' }, { id: 'p1', label: '第一節' }, { id: 'p2', label: '第二節' },
+      { id: 'p3', label: '第三節' }, { id: 'p4', label: '第四節' }, { id: 'lunch', label: '午餐' },
+      { id: 'nap', label: '午休' }, { id: 'p5', label: '第五節' }, { id: 'p6', label: '第六節' },
+      { id: 'p7', label: '第七節' }, { id: 'p8', label: '第八節' },
+    ];
+
+    const ATTENDANCE_TYPES = [
+      { id: 'late', label: '遲到', icon: 'Clock', color: '#FDFD96' },
+      { id: 'sick', label: '病假', icon: 'Stethoscope', color: '#CDF0EA' },
+      { id: 'official', label: '公假', icon: 'Briefcase', color: '#C4E4FF' },
+      { id: 'personal', label: '事假', icon: 'Palmtree', color: '#E2C4FF' },
+      { id: 'other_leave', label: '其他', icon: 'HelpCircle', color: '#E5E7EB' },
+      { id: 'absent', label: '缺席', icon: 'AlertCircle', color: '#FFC4C4' },
+    ];
+
+    const CONTACT_BOOK_TYPES = [
+      { id: 'cb_no_sign', label: '聯絡簿未簽', icon: 'X', color: '#FFC4C4' },
+      { id: 'cb_missing', label: '聯絡簿遲交', icon: 'Clock', color: '#FDFD96' },
+      { id: 'cb_good', label: '聯絡簿優良', icon: 'Star', color: '#CDF0EA' },
+    ];
+
+    const DEFAULT_BEHAVIORS = [
+      { id: 'item_missing', label: '物品未帶', icon: 'PackageX', color: '#FFC4C4' },
+      { id: 'late_class', label: '晚進教室', icon: 'Clock', color: '#FDFD96' },
+      { id: 'noise', label: '吵鬧干擾', icon: 'AlertCircle', color: '#FFC4C4' },
+      { id: 'chat', label: '聊天', icon: 'MessageCircle', color: '#FDFD96' },
+      { id: 'sleep', label: '打瞌睡', icon: 'Coffee', color: '#FFC4C4' },
+      { id: 'no_hw', label: '作業未交', icon: 'FileWarning', color: '#FFC4C4' },
+      { id: 'other', label: '其他', icon: 'PenTool', color: '#C4E4FF' },
+    ];
+
+    const DEFAULT_SUBJECTS = [
+      { id: 'chinese', label: '國文' }, { id: 'english', label: '英語' }, { id: 'math', label: '數學' },
+      { id: 'science', label: '理化' }, { id: 'civics', label: '公民' }, { id: 'history', label: '歷史' },
+      { id: 'geo', label: '地理' },
+    ];
+
+    const NAV_ITEMS = [
+      { id: 'basic', icon: 'User', label: '點名', color: '#CDF0EA' },
+      { id: 'log', icon: 'Edit3', label: '紀錄', color: '#FDFD96' },
+      { id: 'review', icon: 'List', label: '日誌', color: '#FFC4C4' },
+      { id: 'report', icon: 'FileSpreadsheet', label: '報表', color: '#C4E4FF' },
+      { id: 'settings', icon: 'Settings', label: '設定', color: '#FF5252' },
+    ];
+
+    // ============================================
+    // 開機動畫
+    // ============================================
+    const SplashScreen = ({ onComplete, onLoadFile, deviceType }) => {
+      const [phase, setPhase] = useState(0);
+      const fileRef = useRef(null);
+
+      useEffect(() => {
+        const t1 = setTimeout(() => setPhase(1), 400);
+        const t2 = setTimeout(() => setPhase(2), 1000);
+        const t3 = setTimeout(() => setPhase(3), 1600);
+        return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+      }, []);
+
+      const handleFile = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            try { onLoadFile(JSON.parse(ev.target.result)); }
+            catch { alert('檔案格式錯誤！'); }
+          };
+          reader.readAsText(file);
+        }
+      };
+
+      const isLarge = deviceType !== 'mobile';
+
+      return (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 50%, #FDE68A 100%)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          padding: 20
+        }}>
+          {/* Logo */}
+          <div style={{
+            opacity: phase >= 1 ? 1 : 0,
+            transform: phase >= 1 ? 'scale(1)' : 'scale(0.7)',
+            transition: 'all 0.7s ease-out'
+          }}>
+            <div style={{
+              width: isLarge ? 140 : 100, height: isLarge ? 140 : 100,
+              background: 'linear-gradient(135deg, #F59E0B 0%, #EA580C 100%)',
+              borderRadius: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transform: 'rotate(3deg)', border: '4px solid #78350F',
+              boxShadow: '0 20px 40px rgba(120,53,15,0.3)'
+            }}>
+              <Icon name="BookOpen" size={isLarge ? 70 : 50} className="text-white" />
+            </div>
+          </div>
+
+          {/* 標題 */}
+          <h1 style={{
+            marginTop: 32, fontSize: isLarge ? 48 : 32, fontWeight: 900, color: '#78350F',
+            opacity: phase >= 2 ? 1 : 0, transform: phase >= 2 ? 'translateY(0)' : 'translateY(20px)',
+            transition: 'all 0.7s ease-out'
+          }}>
+            班級日誌小幫手
+          </h1>
+
+          <p style={{
+            marginTop: 12, fontSize: isLarge ? 20 : 16, color: '#B45309',
+            opacity: phase >= 2 ? 1 : 0, transition: 'opacity 0.7s'
+          }}>
+            教師的得力助手 ✨
+          </p>
+
+          {/* 裝置提示 */}
+          <div style={{
+            marginTop: 24, display: 'flex', alignItems: 'center', gap: 8,
+            color: '#D97706', fontSize: 14,
+            opacity: phase >= 2 ? 1 : 0, transition: 'opacity 0.5s'
+          }}>
+            <Icon name={deviceType === 'mobile' ? 'Smartphone' : deviceType === 'tablet' ? 'Tablet' : 'Monitor'} size={18} />
+            <span>{deviceType === 'mobile' ? '手機版' : deviceType === 'tablet' ? '平板版' : '桌面版'}</span>
+          </div>
+
+          {/* 按鈕 */}
+          <div style={{
+            marginTop: 40, display: 'flex',
+            flexDirection: isLarge ? 'row' : 'column',
+            gap: 16, width: isLarge ? 'auto' : '100%', maxWidth: 320,
+            opacity: phase >= 3 ? 1 : 0,
+            transform: phase >= 3 ? 'translateY(0)' : 'translateY(30px)',
+            transition: 'all 0.7s ease-out'
+          }}>
+            <button onClick={onComplete} className="btn-3d" style={{
+              padding: '16px 32px', fontSize: 18,
+              background: 'linear-gradient(135deg, #F59E0B, #EA580C)',
+              color: 'white', gap: 12
+            }}>
+              <Icon name="Plus" size={24} className="text-white" />
+              <span>開始新紀錄</span>
+            </button>
+            
+            <div style={{ position: 'relative' }}>
+              <input type="file" accept=".json" onChange={handleFile} ref={fileRef}
+                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
+              <button className="btn-3d" style={{
+                padding: '16px 32px', fontSize: 18, background: 'white',
+                color: '#B45309', gap: 12, width: '100%'
+              }}>
+                <Icon name="FolderOpen" size={24} />
+                <span>載入備份檔</span>
+              </button>
+            </div>
+          </div>
+
+          <p style={{
+            marginTop: 40, fontSize: 14, color: '#D97706',
+            opacity: phase >= 3 ? 1 : 0, transition: 'opacity 0.7s'
+          }}>
+            💡 記得定期下載備份檔保存資料
+          </p>
+        </div>
+      );
+    };
+
+    // ============================================
+    // 學生選擇器
+    // ============================================
+    const StudentSelector = ({ isOpen, onClose, students, selectedList, title, onToggle, deviceType }) => {
+      if (!isOpen) return null;
+      const cols = deviceType === 'desktop' ? 6 : deviceType === 'tablet' ? 5 : 4;
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="card animate-scaleIn" onClick={e => e.stopPropagation()} style={{
+            width: deviceType === 'desktop' ? 700 : deviceType === 'tablet' ? 520 : '100%',
+            maxWidth: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: 16, background: '#FDE68A', borderBottom: '3px solid #78350F',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <h3 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>點選學生</h3>
+              <button onClick={onClose} className="btn-3d" style={{
+                width: 44, height: 44, background: 'white', borderRadius: '50%'
+              }}>
+                <Icon name="Check" size={24} />
+              </button>
+            </div>
+            
+            <div style={{ padding: '8px 16px', background: '#FEF3C7', borderBottom: '2px solid #D97706', fontWeight: 600 }}>
+              正在登記：{title}
+            </div>
+
+            {/* 學生列表 */}
+            <div style={{
+              padding: 16, flex: 1, overflowY: 'auto',
+              display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 12
+            }}>
+              {students.map(s => (
+                <button key={s.id} onClick={() => onToggle(s.id)} style={{
+                  padding: 10, borderRadius: 12, border: '3px solid #78350F',
+                  background: selectedList.includes(s.id) ? '#78350F' : 'white',
+                  color: selectedList.includes(s.id) ? 'white' : '#78350F',
+                  fontWeight: 700, cursor: 'pointer', minHeight: 70,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  transform: selectedList.includes(s.id) ? 'scale(1.05)' : 'scale(1)',
+                  boxShadow: selectedList.includes(s.id) ? '0 4px 12px rgba(0,0,0,0.2)' : 'none',
+                  transition: 'all 0.15s'
+                }}>
+                  <span style={{ fontSize: 12, opacity: 0.7 }}>#{s.id}</span>
+                  <span style={{ fontSize: 16 }}>{s.name}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: 16, borderTop: '3px solid #78350F', background: 'white' }}>
+              <button onClick={onClose} className="btn-3d" style={{
+                width: '100%', padding: 16, fontSize: 20, background: '#CDF0EA'
+              }}>
+                完 成
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================
+    // 側邊欄
+    // ============================================
+    const Sidebar = ({ activeTab, setActiveTab, hasChanges, onSave }) => (
+      <aside style={{
+        width: 260, background: 'white', borderRight: '4px solid #78350F',
+        display: 'flex', flexDirection: 'column', height: '100vh',
+        boxShadow: '4px 0 20px rgba(0,0,0,0.1)'
+      }}>
+        {/* Logo */}
+        <div style={{ padding: 24, borderBottom: '2px solid #FDE68A' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: 14,
+              background: 'linear-gradient(135deg, #F59E0B, #EA580C)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Icon name="BookOpen" size={28} className="text-white" />
+            </div>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 900 }}>班級日誌</div>
+              <div style={{ fontSize: 12, color: '#B45309' }}>小幫手</div>
+            </div>
+          </div>
+        </div>
+
+        {/* 導航 */}
+        <nav style={{ flex: 1, padding: 16 }}>
+          {NAV_ITEMS.map(item => (
+            <button key={item.id} onClick={() => setActiveTab(item.id)} style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+              padding: '14px 18px', marginBottom: 8, borderRadius: 14,
+              border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 17,
+              background: activeTab === item.id ? item.color : 'transparent',
+              color: item.id === 'settings' && activeTab === item.id ? 'white' : '#78350F',
+              transform: activeTab === item.id ? 'scale(1.02)' : 'scale(1)',
+              boxShadow: activeTab === item.id ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+              transition: 'all 0.2s'
+            }}>
+              <Icon name={item.icon} size={22} />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        {/* 儲存按鈕 */}
+        <div style={{ padding: 16, borderTop: '2px solid #FDE68A' }}>
+          <button onClick={onSave} className="btn-3d" style={{
+            width: '100%', padding: 14, gap: 8,
+            background: hasChanges ? '#EF4444' : '#FEF3C7',
+            color: hasChanges ? 'white' : '#78350F',
+            animation: hasChanges ? 'pulse 2s infinite' : 'none'
+          }}>
+            <Icon name={hasChanges ? 'Save' : 'Download'} size={20} className={hasChanges ? 'text-white' : ''} />
+            <span>{hasChanges ? '儲存變更' : '下載備份'}</span>
+          </button>
+        </div>
+      </aside>
+    );
+
+    // ============================================
+    // 底部導航
+    // ============================================
+    const BottomNav = ({ activeTab, setActiveTab }) => (
+      <nav className="safe-bottom" style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+        background: 'white', borderTop: '4px solid #78350F',
+        display: 'flex', justifyContent: 'space-around', padding: '8px 4px'
+      }}>
+        {NAV_ITEMS.map(item => (
+          <button key={item.id} onClick={() => setActiveTab(item.id)} style={{
+            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+            padding: '8px 4px', margin: '0 4px', borderRadius: 12,
+            border: 'none', cursor: 'pointer',
+            background: activeTab === item.id ? item.color : 'transparent',
+            transform: activeTab === item.id ? 'translateY(-8px) scale(1.1)' : 'none',
+            boxShadow: activeTab === item.id ? '0 4px 12px rgba(0,0,0,0.2)' : 'none',
+            opacity: activeTab === item.id ? 1 : 0.6,
+            transition: 'all 0.2s'
+          }}>
+            <Icon name={item.icon} size={24} />
+            <span style={{ fontSize: 11, fontWeight: 700, marginTop: 4 }}>{item.label}</span>
+          </button>
+        ))}
+      </nav>
+    );
+
+    // ============================================
+    // 主程式
+    // ============================================
+    const App = () => {
+      const deviceType = useDeviceType();
+      const [showSplash, setShowSplash] = useState(true);
+      const [activeTab, setActiveTab] = useState('basic');
+      const [hasChanges, setHasChanges] = useState(false);
+
+      const [currentDate, setCurrentDate] = useState(() => {
+        const now = new Date();
+        return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+      });
+
+      const [db, setDb] = useState({});
+      const [subjects, setSubjects] = useState(DEFAULT_SUBJECTS);
+      const [behaviors, setBehaviors] = useState(DEFAULT_BEHAVIORS);
+      const [students, setStudents] = useState(Array.from({ length: 30 }, (_, i) => ({ id: i + 1, name: `${i + 1}號` })));
+      const [teacherNote, setTeacherNote] = useState('');
+
+      const todayData = useMemo(() => {
+        const d = db[currentDate] || {};
+        return {
+          week: d.week || '', dutyOfficer: d.dutyOfficer || '', dutyStudent: d.dutyStudent || '',
+          attendanceData: d.attendanceData || {}, missingData: d.missingData || {},
+          classLogData: d.classLogData || {}, periodNotes: d.periodNotes || {}, incidentLog: d.incidentLog || ''
+        };
+      }, [db, currentDate]);
+
+      const updateToday = useCallback((field, value) => {
+        setHasChanges(true);
+        setDb(prev => ({ ...prev, [currentDate]: { ...prev[currentDate], [field]: value } }));
+      }, [currentDate]);
+
+      const [selectorOpen, setSelectorOpen] = useState(false);
+      const [selectorConfig, setSelectorConfig] = useState({ type: '', category: '', period: '' });
+      const [selectedStudent, setSelectedStudent] = useState(1);
+      const [bulkNames, setBulkNames] = useState('');
+      const [currentSubject, setCurrentSubject] = useState('chinese');
+      const [currentPeriod, setCurrentPeriod] = useState('p1');
+      const [newSubject, setNewSubject] = useState('');
+      const [newBehavior, setNewBehavior] = useState('');
+      const [editingBehaviors, setEditingBehaviors] = useState(false);
+
+      // 載入/儲存
+      const handleLoad = (data) => {
+        if (data.allData) setDb(data.allData);
+        if (data.settings) {
+          data.settings.subjects && setSubjects(data.settings.subjects);
+          data.settings.behaviors && setBehaviors(data.settings.behaviors);
+          data.settings.students && setStudents(data.settings.students);
+          data.settings.teacherNote && setTeacherNote(data.settings.teacherNote);
+        }
+        setShowSplash(false);
+        setHasChanges(false);
+      };
+
+      const handleSave = () => {
+        const data = {
+          version: '13.0',
+          timestamp: new Date().toISOString(),
+          allData: db,
+          settings: { subjects, behaviors, students, teacherNote }
+        };
+        const link = document.createElement('a');
+        link.href = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(data, null, 2));
+        link.download = `班級日誌_備份_${currentDate}.json`;
+        link.click();
+        setHasChanges(false);
+        alert('✅ 備份檔已下載！');
+      };
+
+      // 學生選擇
+      const toggleStudent = (id) => {
+        const { type, category, period } = selectorConfig;
+        if (type === 'attendance') {
+          const list = todayData.attendanceData[category] || [];
+          const newList = list.includes(id) ? list.filter(x => x !== id) : [...list, id];
+          updateToday('attendanceData', { ...todayData.attendanceData, [category]: newList });
+        } else if (type === 'missing') {
+          const list = todayData.missingData[category] || [];
+          const newList = list.includes(id) ? list.filter(x => x !== id) : [...list, id];
+          updateToday('missingData', { ...todayData.missingData, [category]: newList });
+        } else if (type === 'log') {
+          const pData = todayData.classLogData[period] || {};
+          const list = pData[category] || [];
+          const newList = list.includes(id) ? list.filter(x => x !== id) : [...list, id];
+          updateToday('classLogData', { ...todayData.classLogData, [period]: { ...pData, [category]: newList } });
+        }
+      };
+
+      const getSelectedList = () => {
+        const { type, category, period } = selectorConfig;
+        if (type === 'attendance') return todayData.attendanceData[category] || [];
+        if (type === 'missing') return todayData.missingData[category] || [];
+        if (type === 'log') return todayData.classLogData[period]?.[category] || [];
+        return [];
+      };
+
+      const openSelector = (type, category, period = null) => {
+        setSelectorConfig({ type, category, period });
+        setSelectorOpen(true);
+      };
+
+      // CSV 匯出
+      const downloadCSV = (content, filename) => {
+        const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+      };
+
+      const getWeeklyStats = (studentId) => {
+        const dates = [];
+        const today = new Date(currentDate);
+        for (let i = 0; i < 5; i++) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          dates.push(d.toISOString().split('T')[0]);
+        }
+        let stats = { attendance: {}, missing: {} };
+        let detailedAtt = [], detailedMiss = [];
+
+        dates.forEach(date => {
+          const data = db[date];
+          if (!data) return;
+          const ds = date.slice(5).replace('-', '/');
+          if (data.attendanceData) {
+            Object.keys(data.attendanceData).forEach(k => {
+              if (data.attendanceData[k]?.includes(studentId)) {
+                stats.attendance[k] = (stats.attendance[k] || 0) + 1;
+                const t = ATTENDANCE_TYPES.find(x => x.id === k);
+                detailedAtt.push(`${ds} ${t?.label || k}`);
+              }
+            });
+          }
+          if (data.missingData) {
+            Object.keys(data.missingData).forEach(k => {
+              if (data.missingData[k]?.includes(studentId)) {
+                const label = subjects.find(s => s.id === k)?.label + '缺交' || CONTACT_BOOK_TYPES.find(c => c.id === k)?.label || k;
+                stats.missing[label] = (stats.missing[label] || 0) + 1;
+                detailedMiss.push(`${ds} ${label}`);
+              }
+            });
+          }
+        });
+        return { dates, stats, detailedAtt: detailedAtt.reverse(), detailedMiss: detailedMiss.reverse() };
+      };
+
+      const exportClassWeekly = () => {
+        const dates = [];
+        const today = new Date(currentDate);
+        for (let i = 0; i < 5; i++) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          dates.push(d.toISOString().split('T')[0]);
+        }
+        let csv = `全班週報表\n統計範圍,${dates[dates.length-1]} ~ ${dates[0]}\n\n座號,姓名,缺勤,缺交\n`;
+        students.forEach(s => {
+          const { stats } = getWeeklyStats(s.id);
+          const att = Object.values(stats.attendance).reduce((a, b) => a + b, 0);
+          const miss = Object.values(stats.missing).reduce((a, b) => a + b, 0);
+          csv += `${s.id},${s.name},${att},${miss}\n`;
+        });
+        downloadCSV(csv, `全班週報表_${currentDate}.csv`);
+      };
+
+      const exportDaily = () => {
+        let csv = `班級日誌\n日期,${currentDate}\n週次,${todayData.week}\n\n【缺勤】\n`;
+        ATTENDANCE_TYPES.forEach(t => {
+          const list = todayData.attendanceData[t.id];
+          if (list?.length > 0) {
+            csv += `${t.label},${list.map(id => students.find(s => s.id === id)?.name).join('、')}\n`;
+          }
+        });
+        downloadCSV(csv, `班級日誌_${currentDate}.csv`);
+      };
+
+      const generateMessage = (studentId) => {
+        const s = students.find(x => x.id === studentId);
+        if (!s) return '請先選擇學生';
+        const { dates, detailedAtt, detailedMiss } = getWeeklyStats(studentId);
+        const range = `${dates[dates.length-1].slice(5).replace('-','/')} ~ ${dates[0].slice(5).replace('-','/')}`;
+        let msg = teacherNote.trim() ? `📢 重要通知\n${teacherNote}\n\n` : '';
+        msg += `【班級週報】${s.name} 本週 (${range}) 表現：\n\n`;
+        msg += detailedAtt.length > 0 ? `📅 考勤：\n${detailedAtt.map(i => `  - ${i}`).join('\n')}\n` : `📅 考勤：全勤 👍\n`;
+        msg += detailedMiss.length > 0 ? `📚 作業：\n${detailedMiss.map(i => `  - ${i}`).join('\n')}\n` : `📚 作業：良好 👍\n`;
+        msg += `\n請協助關心孩子，謝謝！`;
+        return msg;
+      };
+
+      const copyText = (text) => navigator.clipboard.writeText(text).then(() => alert('已複製！'));
+      const shareLine = (text) => window.open(`https://line.me/R/msg/text/?${encodeURIComponent(text)}`, '_blank');
+
+      // 開機畫面
+      if (showSplash) {
+        return <SplashScreen onComplete={() => setShowSplash(false)} onLoadFile={handleLoad} deviceType={deviceType} />;
+      }
+
+      const isMobile = deviceType === 'mobile';
+      const cardStyle = { padding: isMobile ? 16 : 24 };
+      const gridCols = deviceType === 'desktop' ? 3 : deviceType === 'tablet' ? 3 : 2;
+
+      // ==================== 點名頁 ====================
+      const renderBasic = () => (
+        <div style={{ display: 'grid', gap: 24, gridTemplateColumns: deviceType === 'desktop' ? '1fr 1fr' : '1fr' }}>
+          {/* 基本資訊 */}
+          <div className="card" style={cardStyle}>
+            <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="Calendar" size={22} /> 基本資訊
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>日期</label>
+                <input type="date" value={currentDate} onChange={e => setCurrentDate(e.target.value)} className="input-style" />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>週次</label>
+                <input value={todayData.week} onChange={e => updateToday('week', e.target.value)} className="input-style" placeholder="第__週" />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>值日幹部</label>
+                <input value={todayData.dutyOfficer} onChange={e => updateToday('dutyOfficer', e.target.value)} className="input-style" />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 4 }}>值日生</label>
+                <input value={todayData.dutyStudent} onChange={e => updateToday('dutyStudent', e.target.value)} className="input-style" />
+              </div>
+            </div>
+          </div>
+
+          {/* 到校狀況 */}
+          <div className="card" style={cardStyle}>
+            <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="Clock" size={22} /> 到校狀況
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 12 }}>
+              {ATTENDANCE_TYPES.map(t => {
+                const count = todayData.attendanceData[t.id]?.length || 0;
+                return (
+                  <button key={t.id} onClick={() => openSelector('attendance', t.id)} className="btn-3d" style={{ padding: 12, background: t.color, justifyContent: 'space-between' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Icon name={t.icon} size={18} />
+                      <span>{t.label}</span>
+                    </span>
+                    {count > 0 && <span style={{ background: '#78350F', color: 'white', padding: '2px 8px', borderRadius: 12, fontSize: 13 }}>{count}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 作業聯絡簿 */}
+          <div className="card" style={{ ...cardStyle, gridColumn: deviceType === 'desktop' ? 'span 2' : 'span 1' }}>
+            <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="FileWarning" size={22} /> 作業與聯絡簿
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 12, marginBottom: 16 }}>
+              {CONTACT_BOOK_TYPES.map(t => {
+                const count = todayData.missingData[t.id]?.length || 0;
+                return (
+                  <button key={t.id} onClick={() => openSelector('missing', t.id)} className="btn-3d" style={{ padding: 12, background: t.color, justifyContent: 'space-between' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Icon name={t.icon} size={18} />
+                      <span>{t.label}</span>
+                    </span>
+                    {count > 0 && <span style={{ background: '#78350F', color: 'white', padding: '2px 8px', borderRadius: 12, fontSize: 13 }}>{count}</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ borderTop: '2px solid #FDE68A', paddingTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontWeight: 600 }}>各科作業缺交</span>
+                <select value={currentSubject} onChange={e => setCurrentSubject(e.target.value)} className="input-style" style={{ width: 'auto', padding: '8px 12px' }}>
+                  {subjects.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                </select>
+              </div>
+              <button onClick={() => openSelector('missing', currentSubject)} className="btn-3d" style={{ width: '100%', padding: 14, background: 'white', justifyContent: 'space-between' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Icon name="Edit3" size={18} />
+                  <span>登記 {subjects.find(s => s.id === currentSubject)?.label} 缺交</span>
+                </span>
+                {todayData.missingData[currentSubject]?.length > 0 && (
+                  <span style={{ background: '#FFC4C4', padding: '4px 12px', borderRadius: 16, fontWeight: 700 }}>
+                    {todayData.missingData[currentSubject].length} 人
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+
+      // ==================== 紀錄頁 ====================
+      const renderLog = () => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div className="card" style={cardStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <span style={{ fontWeight: 700 }}>選擇時段：</span>
+              <select value={currentPeriod} onChange={e => setCurrentPeriod(e.target.value)} className="input-style" style={{ flex: 1, background: '#FEF3C7', fontWeight: 700, fontSize: 18 }}>
+                {PERIODS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
+            </div>
+            <input value={todayData.periodNotes[currentPeriod] || ''} onChange={e => updateToday('periodNotes', { ...todayData.periodNotes, [currentPeriod]: e.target.value })} className="input-style" placeholder={`${PERIODS.find(p => p.id === currentPeriod)?.label} 備註...`} />
+          </div>
+
+          <div className="card" style={cardStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>違規項目</h3>
+              <button onClick={() => setEditingBehaviors(!editingBehaviors)} className="btn-3d" style={{ padding: '8px 16px', background: editingBehaviors ? '#FFC4C4' : '#F3F4F6' }}>
+                <Icon name="Settings" size={16} />
+                <span style={{ marginLeft: 6 }}>{editingBehaviors ? '完成' : '編輯'}</span>
+              </button>
+            </div>
+
+            {editingBehaviors && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                <input value={newBehavior} onChange={e => setNewBehavior(e.target.value)} className="input-style" placeholder="新違規項目..." />
+                <button onClick={() => {
+                  if (newBehavior.trim()) {
+                    setBehaviors([...behaviors, { id: `b${Date.now()}`, label: newBehavior.trim(), icon: 'AlertCircle', color: '#FDFD96' }]);
+                    setNewBehavior('');
+                    setHasChanges(true);
+                  }
+                }} className="btn-3d" style={{ padding: '0 16px', background: '#78350F', color: 'white' }}>
+                  <Icon name="Plus" size={20} className="text-white" />
+                </button>
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 3 : 5}, 1fr)`, gap: 12 }}>
+              {behaviors.map(b => {
+                const count = todayData.classLogData[currentPeriod]?.[b.id]?.length || 0;
+                return (
+                  <button key={b.id} onClick={() => !editingBehaviors && openSelector('log', b.id, currentPeriod)} className="btn-3d" style={{ padding: 12, background: b.color, flexDirection: 'column', minHeight: 80, position: 'relative' }}>
+                    {editingBehaviors && (
+                      <span onClick={e => { e.stopPropagation(); setBehaviors(behaviors.filter(x => x.id !== b.id)); setHasChanges(true); }} style={{ position: 'absolute', top: -8, right: -8, width: 24, height: 24, background: '#EF4444', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '2px solid white' }}>
+                        <Icon name="X" size={14} className="text-white" />
+                      </span>
+                    )}
+                    <Icon name={b.icon} size={26} />
+                    <span style={{ fontSize: 13, marginTop: 4 }}>{b.label}</span>
+                    {!editingBehaviors && count > 0 && (
+                      <span style={{ position: 'absolute', top: -8, right: -8, width: 26, height: 26, background: '#EF4444', color: 'white', borderRadius: '50%', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white' }}>{count}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="card" style={cardStyle}>
+            <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="MessageCircle" size={22} /> 全日偶發/總結
+            </h3>
+            <textarea value={todayData.incidentLog} onChange={e => updateToday('incidentLog', e.target.value)} className="input-style" style={{ height: 120, resize: 'none' }} placeholder="今日其他補充..." />
+          </div>
+        </div>
+      );
+
+      // ==================== 日誌頁 ====================
+      const renderReview = () => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={exportDaily} className="btn-3d" style={{ padding: '12px 24px', background: '#FEF3C7' }}>
+              <Icon name="FileSpreadsheet" size={20} />
+              <span style={{ marginLeft: 8 }}>匯出 Excel</span>
+            </button>
+          </div>
+
+          <div className="card" style={{ ...cardStyle, fontFamily: 'monospace' }}>
+            <h2 style={{ textAlign: 'center', fontSize: 24, fontWeight: 700, marginBottom: 24, paddingBottom: 16, borderBottom: '3px solid #78350F' }}>
+              {todayData.week || '____'}週 班級日誌 ({currentDate})
+            </h2>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24, fontSize: 18 }}>
+              <div>值日幹部：{todayData.dutyOfficer || '—'}</div>
+              <div>值日生：{todayData.dutyStudent || '—'}</div>
+            </div>
+
+            <div style={{ background: '#FEF3C7', border: '2px solid #78350F', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>📋 缺勤</h3>
+              {ATTENDANCE_TYPES.map(t => todayData.attendanceData[t.id]?.length > 0 && (
+                <div key={t.id} style={{ padding: '8px 0' }}>
+                  <b>{t.label}：</b>{todayData.attendanceData[t.id].map(id => students.find(s => s.id === id)?.name).join('、')}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ background: '#FEF3C7', border: '2px solid #78350F', borderRadius: 12, padding: 16 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>📚 缺交</h3>
+              {CONTACT_BOOK_TYPES.map(t => todayData.missingData[t.id]?.length > 0 && (
+                <div key={t.id} style={{ padding: '8px 0' }}>
+                  <b>{t.label}：</b>{todayData.missingData[t.id].map(id => students.find(s => s.id === id)?.name).join('、')}
+                </div>
+              ))}
+              {subjects.map(s => todayData.missingData[s.id]?.length > 0 && (
+                <div key={s.id} style={{ padding: '8px 0' }}>
+                  <b>{s.label}：</b>{todayData.missingData[s.id].map(id => students.find(st => st.id === id)?.name).join('、')}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+
+      // ==================== 報表頁 ====================
+      const renderReports = () => {
+        const { stats, detailedAtt, detailedMiss } = getWeeklyStats(selectedStudent);
+        const msg = generateMessage(selectedStudent);
+
+        return (
+          <div style={{ display: 'grid', gap: 24, gridTemplateColumns: deviceType === 'desktop' ? '1fr 1fr' : '1fr' }}>
+            <div className="card" style={{ ...cardStyle, background: 'linear-gradient(135deg, #FEF3C7, #FFEDD5)' }}>
+              <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="FileSpreadsheet" size={22} /> 教師專用：週報表
+              </h3>
+              <button onClick={exportClassWeekly} className="btn-3d" style={{ width: '100%', padding: 16, background: 'white' }}>
+                <Icon name="Download" size={20} />
+                <span style={{ marginLeft: 8 }}>下載全班週報表</span>
+              </button>
+            </div>
+
+            <div className="card" style={{ ...cardStyle, borderColor: '#EF4444' }}>
+              <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="Megaphone" size={22} /> 老師的話
+              </h3>
+              <textarea value={teacherNote} onChange={e => { setTeacherNote(e.target.value); setHasChanges(true); }} className="input-style" style={{ height: 100, background: '#FEF2F2' }} placeholder="輸入重要事項..." />
+            </div>
+
+            <div className="card" style={{ ...cardStyle, background: '#FEF3C7', gridColumn: deviceType === 'desktop' ? 'span 2' : 'span 1' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+                <Icon name="User" size={32} />
+                <div>
+                  <div style={{ fontSize: 13, color: '#B45309' }}>查看學生週報</div>
+                  <select value={selectedStudent} onChange={e => setSelectedStudent(Number(e.target.value))} style={{ fontSize: 24, fontWeight: 700, background: 'transparent', border: 'none', borderBottom: '3px solid #78350F', outline: 'none' }}>
+                    {students.map(s => <option key={s.id} value={s.id}>{s.id}. {s.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                <div style={{ background: 'white', borderRadius: 12, padding: 16, textAlign: 'center', border: '3px solid #78350F' }}>
+                  <div style={{ fontSize: 40, fontWeight: 900, color: '#78350F' }}>{Object.values(stats.attendance).reduce((a, b) => a + b, 0)}</div>
+                  <div style={{ fontSize: 14, color: '#B45309' }}>本週缺勤</div>
+                </div>
+                <div style={{ background: 'white', borderRadius: 12, padding: 16, textAlign: 'center', border: '3px solid #78350F' }}>
+                  <div style={{ fontSize: 40, fontWeight: 900, color: '#EC4899' }}>{Object.values(stats.missing).reduce((a, b) => a + b, 0)}</div>
+                  <div style={{ fontSize: 14, color: '#B45309' }}>本週缺交</div>
+                </div>
+              </div>
+
+              <div style={{ background: 'white', border: '3px solid #78350F', borderRadius: 12, padding: 16, height: 180, overflowY: 'auto', whiteSpace: 'pre-wrap', fontSize: 14, marginBottom: 16 }}>
+                {msg}
+              </div>
+
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button onClick={() => shareLine(msg)} className="btn-3d" style={{ flex: 2, padding: 14, background: '#22C55E', color: 'white' }}>
+                  <Icon name="Send" size={20} className="text-white" />
+                  <span style={{ marginLeft: 8 }}>LINE</span>
+                </button>
+                <button onClick={() => copyText(msg)} className="btn-3d" style={{ flex: 1, padding: 14, background: '#CDF0EA' }}>
+                  <Icon name="ClipboardCopy" size={20} />
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      // ==================== 設定頁 ====================
+      const renderSettings = () => (
+        <div style={{ display: 'grid', gap: 24, gridTemplateColumns: deviceType === 'desktop' ? '1fr 1fr' : '1fr' }}>
+          <div className="card" style={{ ...cardStyle, background: 'linear-gradient(135deg, #FEF3C7, #FFEDD5)', borderColor: '#D97706' }}>
+            <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="Database" size={22} /> 資料管理
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <button onClick={handleSave} className="btn-3d" style={{ padding: 16, background: 'white', flexDirection: 'column', gap: 8 }}>
+                <Icon name="Download" size={28} />
+                <span>下載備份</span>
+              </button>
+              <div style={{ position: 'relative' }}>
+                <input type="file" accept=".json" onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = ev => {
+                      try { handleLoad(JSON.parse(ev.target.result)); alert('✅ 載入成功！'); }
+                      catch { alert('❌ 檔案錯誤'); }
+                    };
+                    reader.readAsText(file);
+                  }
+                  e.target.value = '';
+                }} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
+                <button className="btn-3d" style={{ width: '100%', padding: 16, background: 'white', flexDirection: 'column', gap: 8 }}>
+                  <Icon name="Upload" size={28} />
+                  <span>載入備份</span>
+                </button>
+              </div>
+            </div>
+            {hasChanges && <p style={{ marginTop: 16, color: '#DC2626', fontWeight: 700, textAlign: 'center', animation: 'pulse 2s infinite' }}>⚠️ 有未儲存的變更！</p>}
+          </div>
+
+          <div className="card" style={cardStyle}>
+            <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="UserCog" size={22} /> 學生名單
+            </h3>
+            <textarea value={bulkNames} onChange={e => setBulkNames(e.target.value)} className="input-style" style={{ height: 120, marginBottom: 12 }} placeholder="批次匯入（一行一個）&#10;王小明&#10;李大同" />
+            <button onClick={() => {
+              if (!bulkNames.trim()) return;
+              const names = bulkNames.split('\n').map(n => n.trim()).filter(n => n);
+              if (confirm(`匯入 ${names.length} 位學生？`)) {
+                setStudents(names.map((name, i) => ({ id: i + 1, name })));
+                setBulkNames('');
+                setHasChanges(true);
+                alert('匯入成功！');
+              }
+            }} className="btn-3d" style={{ width: '100%', padding: 14, background: '#FEF3C7' }}>
+              <Icon name="Download" size={20} />
+              <span style={{ marginLeft: 8 }}>匯入名單</span>
+            </button>
+            <div style={{ marginTop: 16, maxHeight: 200, overflowY: 'auto', borderTop: '2px solid #FDE68A', paddingTop: 12 }}>
+              {students.map(s => (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span style={{ width: 40, fontWeight: 700 }}>#{s.id}</span>
+                  <input value={s.name} onChange={e => { setStudents(students.map(st => st.id === s.id ? { ...st, name: e.target.value } : st)); setHasChanges(true); }} className="input-style" style={{ padding: 8 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card" style={{ ...cardStyle, gridColumn: deviceType === 'desktop' ? 'span 2' : 'span 1' }}>
+            <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="BookOpen" size={22} /> 科目管理
+            </h3>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <input value={newSubject} onChange={e => setNewSubject(e.target.value)} className="input-style" placeholder="新科目..." />
+              <button onClick={() => {
+                if (newSubject.trim()) {
+                  setSubjects([...subjects, { id: `s${Date.now()}`, label: newSubject.trim() }]);
+                  setNewSubject('');
+                  setHasChanges(true);
+                }
+              }} className="btn-3d" style={{ padding: '0 16px', background: '#78350F', color: 'white' }}>
+                <Icon name="Plus" size={20} className="text-white" />
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {subjects.map(s => (
+                <span key={s.id} style={{ background: '#F3F4F6', border: '2px solid #78350F', borderRadius: 20, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {s.label}
+                  <span onClick={() => { setSubjects(subjects.filter(x => x.id !== s.id)); setHasChanges(true); }} style={{ cursor: 'pointer', opacity: 0.5 }}>
+                    <Icon name="X" size={16} />
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+
+      // ==================== 主渲染 ====================
+      return (
+        <div className="bg-grid" style={{ minHeight: '100vh', display: 'flex', flexDirection: isMobile ? 'column' : 'row' }}>
+          {/* 側邊欄 */}
+          {!isMobile && <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} hasChanges={hasChanges} onSave={handleSave} />}
+
+          {/* 主內容 */}
+          <main style={{ flex: 1, padding: isMobile ? '16px 16px 100px' : 32, overflowY: 'auto' }}>
+            {/* 手機頂部 */}
+            {isMobile && (
+              <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg, #F59E0B, #EA580C)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="BookOpen" size={24} className="text-white" />
+                  </div>
+                  <h1 style={{ fontSize: 22, fontWeight: 900, margin: 0 }}>班級日誌</h1>
+                </div>
+                {hasChanges && (
+                  <button onClick={handleSave} className="btn-3d" style={{ padding: '8px 16px', background: '#EF4444', color: 'white', animation: 'pulse 2s infinite' }}>
+                    <Icon name="Save" size={18} className="text-white" />
+                  </button>
+                )}
+              </header>
+            )}
+
+            {/* 桌面標題 */}
+            {!isMobile && (
+              <header style={{ marginBottom: 32 }}>
+                <h2 style={{ fontSize: 32, fontWeight: 900, margin: 0 }}>{NAV_ITEMS.find(n => n.id === activeTab)?.label}</h2>
+                <p style={{ marginTop: 4, color: '#B45309' }}>{currentDate} {todayData.week && `• 第${todayData.week}週`}</p>
+              </header>
+            )}
+
+            {/* 內容 */}
+            <div style={{ maxWidth: deviceType === 'desktop' ? 1200 : '100%' }}>
+              {activeTab === 'basic' && renderBasic()}
+              {activeTab === 'log' && renderLog()}
+              {activeTab === 'review' && renderReview()}
+              {activeTab === 'report' && renderReports()}
+              {activeTab === 'settings' && renderSettings()}
+            </div>
+          </main>
+
+          {/* 底部導航 */}
+          {isMobile && <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />}
+
+          {/* 學生選擇器 */}
+          <StudentSelector
+            isOpen={selectorOpen}
+            onClose={() => setSelectorOpen(false)}
+            students={students}
+            selectedList={getSelectedList()}
+            title={
+              selectorConfig.type === 'attendance' ? ATTENDANCE_TYPES.find(t => t.id === selectorConfig.category)?.label :
+              selectorConfig.type === 'missing' ? (CONTACT_BOOK_TYPES.find(t => t.id === selectorConfig.category)?.label || subjects.find(s => s.id === selectorConfig.category)?.label + '缺交') :
+              `${PERIODS.find(p => p.id === selectorConfig.period)?.label} - ${behaviors.find(b => b.id === selectorConfig.category)?.label}`
+            }
+            onToggle={toggleStudent}
+            deviceType={deviceType}
+          />
+        </div>
+      );
+    };
+
+    // 渲染
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
