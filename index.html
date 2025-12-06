@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#F59E0B">
+  <title>班級日誌小幫手</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <!-- 外部檔案解析庫 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+  <style>
+    * { box-sizing: border-box; font-family: 'Noto Sans TC', -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+    html, body { min-height: 100vh; min-height: -webkit-fill-available; background: #FFFBEB; color: #78350F; overflow-x: hidden; }
+    
+    .bg-grid { 
+      background-image: linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px); 
+      background-size: 20px 20px; min-height: 100vh; 
+    }
+    
+    .btn { 
+      border: 3px solid #78350F; border-radius: 16px; box-shadow: 4px 4px 0px #78350F; 
+      font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; 
+      gap: 8px; background: white; color: #78350F; font-size: 16px; padding: 12px 20px; 
+      -webkit-appearance: none; appearance: none;
+    }
+    .btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0px #78350F; }
+    
+    .card { background: white; border: 3px solid #78350F; border-radius: 20px; box-shadow: 6px 6px 0px rgba(120,53,15,0.15); padding: 16px; margin-bottom: 16px; }
+    
+    .input { 
+      width: 100%; border: 3px solid #78350F; border-radius: 12px; padding: 12px; 
+      font-size: 16px; background: white; color: #78350F; 
+      -webkit-appearance: none; appearance: none; outline: none;
+    }
+    .input:focus { box-shadow: 3px 3px 0px #78350F; background: #FFFEF5; }
+    select.input { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2378350F' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+    textarea.input { resize: none; min-height: 80px; line-height: 1.5; }
+    
+    .nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 4px solid #78350F; display: flex; padding: 8px 4px; padding-bottom: max(8px, env(safe-area-inset-bottom)); z-index: 100; }
+    .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 6px; border: none; background: transparent; cursor: pointer; border-radius: 12px; color: #78350F; opacity: 0.5; transition: all 0.2s; }
+    .nav-item.active { opacity: 1; transform: translateY(-6px); }
+    .nav-item span { font-size: 11px; font-weight: 700; margin-top: 4px; }
+    
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 200; padding: 16px; }
+    .modal.show { display: flex; }
+    .modal-box { background: white; border: 3px solid #78350F; border-radius: 20px; width: 100%; max-width: 400px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column; }
+    .modal-header { padding: 14px 16px; background: #FDE68A; border-bottom: 3px solid #78350F; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { font-size: 18px; font-weight: 700; }
+    .modal-body { padding: 16px; overflow-y: auto; flex: 1; }
+    .modal-footer { padding: 16px; border-top: 3px solid #78350F; }
+    
+    .student-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .student-btn { padding: 10px 4px; border: 3px solid #78350F; border-radius: 10px; background: white; cursor: pointer; font-weight: 700; font-size: 13px; text-align: center; transition: all 0.15s; }
+    .student-btn.selected { background: #78350F; color: white; transform: scale(1.05); }
+    
+    .header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; padding-top: max(14px, env(safe-area-inset-top)); }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .logo { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #F59E0B, #EA580C); display: flex; align-items: center; justify-content: center; }
+    .header h1 { font-size: 20px; font-weight: 900; }
+    
+    .content { padding: 0 16px 100px 16px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .section-title { font-size: 17px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .count-badge { background: #78350F; color: white; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin-left: auto; }
+    
+    .item-btn { 
+      width: 100%; padding: 12px; border: 3px solid #78350F; border-radius: 14px; 
+      cursor: pointer; display: flex; align-items: center; justify-content: space-between; 
+      font-weight: 600; font-size: 14px; margin-bottom: 8px; text-align: left;
+    }
+    .item-btn-inner { display: flex; align-items: center; gap: 6px; }
+    
+    .page { display: none; }
+    .page.active { display: block; }
+    
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes spinR { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.02); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(245,158,11,0.4), 0 0 40px rgba(234,88,12,0.2); } 50% { box-shadow: 0 0 30px rgba(245,158,11,0.6), 0 0 60px rgba(234,88,12,0.4); } }
+    @keyframes twinkle { 0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; } 50% { transform: scale(1.3) rotate(15deg); opacity: 0.7; } }
+    @keyframes bounceIn { 0% { transform: scale(0); opacity: 0; } 50% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .splash { position: fixed; inset: 0; background: linear-gradient(135deg, #FFFBEB 0%, #FDE68A 50%, #FCD34D 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; padding: 20px; overflow: hidden; }
+    .splash.hide { display: none; }
+    .splash::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 60%); animation: spin 20s linear infinite; }
+    .splash-container { position: relative; display: flex; align-items: center; justify-content: center; animation: bounceIn 0.6s ease-out; }
+    .splash-ring1 { position: absolute; width: 180px; height: 180px; border: 4px dashed #D97706; border-radius: 50%; animation: spin 8s linear infinite; opacity: 0.6; }
+    .splash-ring2 { position: absolute; width: 155px; height: 155px; border: 3px dotted #F59E0B; border-radius: 50%; animation: spinR 6s linear infinite; opacity: 0.5; }
+    .splash-ring3 { position: absolute; width: 210px; height: 210px; border: 2px solid rgba(217,119,6,0.3); border-radius: 50%; animation: spin 12s linear infinite; }
+    .splash-logo { 
+      width: 120px; height: 120px; border-radius: 50%; 
+      background: linear-gradient(135deg, #F59E0B 0%, #EA580C 50%, #DC2626 100%); 
+      display: flex; align-items: center; justify-content: center; 
+      border: 5px solid #78350F; 
+      box-shadow: 0 8px 32px rgba(234,88,12,0.4), inset 0 -4px 12px rgba(0,0,0,0.2), inset 0 4px 12px rgba(255,255,255,0.3); 
+      animation: float 3s ease-in-out infinite, glow 2s ease-in-out infinite; 
+      position: relative; overflow: hidden; 
+    }
+    .splash-logo::after { content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); animation: shine 2.5s ease-in-out infinite; }
+    @keyframes shine { 0%, 100% { left: -100%; } 50% { left: 150%; } }
+    
+    .splash-deco { position: absolute; }
+    .splash-star { top: -25px; right: -25px; width: 40px; height: 40px; background: linear-gradient(135deg, #FCD34D, #F59E0B); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid #78350F; box-shadow: 3px 3px 0 #78350F; animation: twinkle 1.5s ease-in-out infinite, bounceIn 0.5s ease-out 0.3s both; }
+    .splash-pencil { bottom: -20px; right: -30px; width: 36px; height: 36px; background: linear-gradient(135deg, #22C55E, #16A34A); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid #78350F; box-shadow: 3px 3px 0 #78350F; animation: bounceIn 0.5s ease-out 0.5s both; transform-origin: center; }
+    .splash-pencil:hover { animation: spin 0.5s ease-in-out; }
+    .splash-heart { bottom: -15px; left: -25px; width: 32px; height: 32px; background: linear-gradient(135deg, #EC4899, #DB2777); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid #78350F; box-shadow: 3px 3px 0 #78350F; animation: pulse 2s ease-in-out infinite, bounceIn 0.5s ease-out 0.7s both; }
+    
+    .splash-title { margin-top: 35px; font-size: 36px; font-weight: 900; color: #78350F; text-shadow: 3px 3px 0 rgba(120,53,15,0.1); animation: slideUp 0.6s ease-out 0.4s both; }
+    .splash-sub { margin-top: 12px; font-size: 20px; color: #B45309; font-weight: 500; animation: slideUp 0.6s ease-out 0.6s both; }
+    .splash-device { margin-top: 20px; padding: 10px 20px; background: rgba(255,255,255,0.9); border: 3px solid #F59E0B; border-radius: 25px; font-size: 14px; color: #B45309; font-weight: 600; display: flex; align-items: center; gap: 8px; animation: slideUp 0.6s ease-out 0.8s both; box-shadow: 0 4px 12px rgba(245,158,11,0.2); }
+    .splash-btns { margin-top: 40px; display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 300px; animation: slideUp 0.6s ease-out 1s both; }
+    .splash-btns .btn-primary { background: linear-gradient(135deg, #F59E0B, #EA580C); color: white; border-color: #78350F; font-size: 18px; padding: 16px 24px; animation: pulse 2.5s ease-in-out infinite; }
+    .splash-btns .btn-primary:hover { transform: scale(1.02); }
+    .splash-tip { margin-top: 35px; font-size: 14px; color: #92400E; opacity: 0.9; animation: slideUp 0.6s ease-out 1.2s both; background: rgba(255,255,255,0.5); padding: 10px 20px; border-radius: 20px; }
+    
+    .save-float { position: fixed; bottom: 85px; right: 16px; z-index: 50; background: #EF4444; color: white; animation: pulse 2s infinite; }
+    
+    .report-box { background: white; border: 3px solid #78350F; border-radius: 12px; padding: 14px; margin-bottom: 14px; white-space: pre-wrap; font-size: 13px; line-height: 1.6; max-height: 160px; overflow-y: auto; }
+    .stat-card { background: white; border: 3px solid #78350F; border-radius: 12px; padding: 14px; text-align: center; }
+    .stat-num { font-size: 36px; font-weight: 900; }
+    .stat-label { font-size: 13px; color: #B45309; margin-top: 4px; }
+    
+    label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <!-- 開機畫面 -->
+  <div id="splash" class="splash">
+    <div class="splash-container">
+      <div class="splash-ring3"></div>
+      <div class="splash-ring1"></div>
+      <div class="splash-ring2"></div>
+      <div class="splash-logo">
+        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      </div>
+      <!-- 裝飾元素 -->
+      <div class="splash-deco splash-star">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#78350F" stroke="#78350F" stroke-width="1"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      </div>
+      <div class="splash-deco splash-pencil">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </div>
+      <div class="splash-deco splash-heart">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      </div>
+    </div>
+    <h1 class="splash-title">班級日誌小幫手</h1>
+    <p class="splash-sub">教師的得力助手 ✨</p>
+    <div class="splash-device">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+      <span id="deviceLabel">載入中...</span>
+    </div>
+    <div class="splash-btns">
+      <button class="btn btn-primary" onclick="startNew()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+        開始新紀錄
+      </button>
+      <button class="btn" onclick="document.getElementById('fileInput').click()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2 2h9a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5z"/></svg>
+        載入備份檔
+      </button>
+      <input type="file" id="fileInput" accept=".json" style="display:none" onchange="loadFile(event)">
+    </div>
+    <p class="splash-tip">💡 記得定期下載備份檔保存資料</p>
+  </div>
+
+  <!-- 主程式 -->
+  <div id="app" class="bg-grid" style="display:none">
+    <!-- 頂部 -->
+    <div class="header">
+      <div class="header-left">
+        <div class="logo">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        </div>
+        <h1>班級日誌</h1>
+      </div>
+      <button id="saveBtn" class="btn save-float" style="display:none;position:static" onclick="saveData()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+      </button>
+    </div>
+
+    <!-- 內容區 -->
+    <div class="content">
+      <!-- 點名頁 -->
+      <div id="page-basic" class="page active">
+        <div class="card">
+          <div class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            基本資訊
+          </div>
+          <div class="grid-2" style="margin-bottom:10px">
+            <div>
+              <label>日期</label>
+              <input type="date" id="currentDate" class="input" onchange="dateChanged()">
+            </div>
+            <div>
+              <label>週次</label>
+              <select id="weekNum" class="input" onchange="saveField('week', this.value)">
+                <option value="">請選擇</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div>
+              <label>值日幹部</label>
+              <select id="dutyOfficer" class="input" onchange="saveField('dutyOfficer', this.value)">
+                <option value="">請選擇</option>
+              </select>
+            </div>
+            <div>
+              <label>值日生</label>
+              <select id="dutyStudent" class="input" onchange="saveField('dutyStudent', this.value)">
+                <option value="">請選擇</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            到校狀況
+          </div>
+          <div id="attendanceList"></div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M12 9v4M12 17h.01"/></svg>
+            作業與聯絡簿
+          </div>
+          <div id="contactList"></div>
+          <div style="border-top:2px solid #FDE68A;margin-top:12px;padding-top:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <span style="font-weight:600;font-size:14px">各科作業缺交</span>
+              <select id="subjectSelect" class="input" style="width:auto;padding:8px 32px 8px 12px"></select>
+            </div>
+            <button class="item-btn" style="background:#FEF3C7" onclick="openMissingSubject()">
+              <span class="item-btn-inner">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                <span id="subjectBtnLabel">登記缺交</span>
+              </span>
+              <span id="subjectCount" class="count-badge" style="display:none">0</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 紀錄頁 -->
+      <div id="page-log" class="page">
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <span style="font-weight:700">選擇時段：</span>
+            <select id="periodSelect" class="input" style="flex:1;background:#FEF3C7;font-weight:700" onchange="periodChanged()"></select>
+          </div>
+          <input type="text" id="periodNote" class="input" placeholder="本節備註..." onchange="savePeriodNote()">
+        </div>
+
+        <div class="card">
+          <div class="section-title">違規項目</div>
+          <div id="behaviorList"></div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            全日偶發/總結
+          </div>
+          <textarea id="incidentLog" class="input" placeholder="今日其他補充..." onchange="saveField('incidentLog', this.value)"></textarea>
+        </div>
+      </div>
+
+      <!-- 日誌頁 -->
+      <div id="page-review" class="page">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+          <button class="btn" onclick="exportDaily()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M14 2v6h6M8 13h2M14 13h2M8 17h2M14 17h2"/></svg>
+            匯出 Excel
+          </button>
+        </div>
+        <div class="card" id="reviewContent"></div>
+      </div>
+
+      <!-- 報表頁 -->
+      <div id="page-report" class="page">
+        <div class="card" style="background:linear-gradient(135deg,#FEF3C7,#FFEDD5)">
+          <div class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M14 2v6h6M8 13h2M14 13h2M8 17h2M14 17h2"/></svg>
+            教師專用：週報表
+          </div>
+          <button class="btn" style="width:100%" onclick="exportWeekly()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            下載全班週報表
+          </button>
+        </div>
+
+        <div class="card" style="border-color:#EF4444">
+          <div class="section-title" style="color:#DC2626">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+            老師的話
+          </div>
+          <textarea id="teacherNote" class="input" style="background:#FEF2F2" placeholder="輸入重要事項..." onchange="hasChanges=true;showSaveBtn()"></textarea>
+        </div>
+
+        <div class="card" style="background:#FEF3C7">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <div>
+              <div style="font-size:12px;color:#B45309">查看學生週報</div>
+              <select id="reportStudent" class="input" style="font-size:20px;font-weight:700;border:none;border-bottom:3px solid #78350F;border-radius:0;padding:4px 0;background:transparent" onchange="updateReport()"></select>
+            </div>
+          </div>
+          <div class="grid-2" style="margin-bottom:14px">
+            <div class="stat-card">
+              <div id="statAtt" class="stat-num" style="color:#78350F">0</div>
+              <div class="stat-label">本週缺勤</div>
+            </div>
+            <div class="stat-card">
+              <div id="statMiss" class="stat-num" style="color:#EC4899">0</div>
+              <div class="stat-label">本週缺交</div>
+            </div>
+          </div>
+          <div id="reportBox" class="report-box"></div>
+          <div class="grid-2">
+            <button class="btn" style="background:#22C55E;color:white;flex:2" onclick="shareLine()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+              LINE 分享
+            </button>
+            <button class="btn" onclick="copyReport()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 設定頁 -->
+      <div id="page-settings" class="page">
+        <div class="card" style="background:linear-gradient(135deg,#FEF3C7,#FFEDD5);border-color:#D97706">
+          <div class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            資料管理
+          </div>
+          <div class="grid-2">
+            <button class="btn" onclick="saveData()">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              下載備份
+            </button>
+            <div style="position:relative">
+              <input type="file" accept=".json" style="position:absolute;inset:0;opacity:0;cursor:pointer;z-index:10" onchange="loadFile(event)">
+              <button class="btn" style="width:100%">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                載入備份
+              </button>
+            </div>
+          </div>
+          <p id="changesWarning" style="display:none;margin-top:12px;color:#DC2626;font-weight:700;text-align:center">⚠️ 有未儲存的變更！</p>
+        </div>
+
+        <div class="card">
+          <div class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 12h-6"/></svg>
+            學生名單
+          </div>
+          
+          <!-- 外部檔案匯入 -->
+          <div style="background:#E0F2FE;border:2px dashed #0284C7;border-radius:12px;padding:14px;margin-bottom:14px">
+            <div style="font-weight:700;font-size:14px;color:#0369A1;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M14 2v6h6"/></svg>
+              從檔案匯入名單
+            </div>
+            <div style="position:relative">
+              <input type="file" id="studentFileInput" accept=".xlsx,.xls,.csv,.pdf,.docx,.doc,.txt" style="position:absolute;inset:0;opacity:0;cursor:pointer;z-index:10" onchange="importStudentFile(event)">
+              <button class="btn" style="width:100%;background:#0EA5E9;color:white;border-color:#0369A1">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                選擇檔案
+              </button>
+            </div>
+            <div style="margin-top:10px;font-size:12px;color:#0369A1;line-height:1.6">
+              <div style="font-weight:600;margin-bottom:4px">📋 支援格式：</div>
+              <div>Excel (.xlsx, .xls)、CSV、PDF、Word (.docx)、純文字 (.txt)</div>
+              <div style="margin-top:8px;padding:8px;background:rgba(255,255,255,0.7);border-radius:8px">
+                <div style="font-weight:600;color:#B45309">⚠️ 檔案格式要求：</div>
+                <div style="color:#78350F">• 需包含標頭列：<b>座號</b>、<b>姓名</b></div>
+                <div style="color:#78350F">• 標頭列會自動跳過，不會匯入</div>
+                <div style="color:#78350F">• Excel 範例（直接用表格欄位）：</div>
+                <table style="background:#FEF3C7;border-radius:6px;margin-top:4px;font-size:11px;width:100%;border-collapse:collapse">
+                  <tr style="border-bottom:1px solid #D97706"><td style="padding:4px 8px;border-right:1px solid #D97706;font-weight:600">座號</td><td style="padding:4px 8px;font-weight:600">姓名</td></tr>
+                  <tr style="border-bottom:1px solid #FDE68A"><td style="padding:4px 8px;border-right:1px solid #D97706">1</td><td style="padding:4px 8px">王小明</td></tr>
+                  <tr style="border-bottom:1px solid #FDE68A"><td style="padding:4px 8px;border-right:1px solid #D97706">2</td><td style="padding:4px 8px">李大同</td></tr>
+                  <tr><td style="padding:4px 8px;border-right:1px solid #D97706">...</td><td style="padding:4px 8px">...</td></tr>
+                </table>
+                <div style="color:#78350F;margin-top:6px">• CSV/TXT 範例（用逗號分隔）：</div>
+                <div style="background:#FEF3C7;padding:6px 10px;border-radius:6px;margin-top:4px;font-family:monospace;font-size:11px">
+                  座號, 姓名<br>
+                  1, 王小明<br>
+                  2, 李大同
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 手動輸入 -->
+          <div style="border-top:2px solid #FDE68A;padding-top:14px">
+            <div style="font-size:13px;font-weight:600;color:#78350F;margin-bottom:8px">或手動輸入（一行一個姓名）：</div>
+            <textarea id="bulkNames" class="input" style="height:80px" placeholder="王小明&#10;李大同&#10;張美麗"></textarea>
+            <button class="btn" style="width:100%;margin-top:10px;background:#FEF3C7" onclick="importStudents()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              匯入手動名單
+            </button>
+          </div>
+          
+          <!-- 目前名單 -->
+          <div style="margin-top:14px;border-top:2px solid #FDE68A;padding-top:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <span style="font-size:13px;font-weight:600">目前名單 (<span id="studentCount">0</span> 人)</span>
+              <div style="display:flex;gap:6px">
+                <button class="btn" style="padding:6px 10px;font-size:12px;background:#22C55E;color:white;border-color:#16A34A" onclick="addNewStudent()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                  新增
+                </button>
+                <button class="btn" style="padding:6px 10px;font-size:12px" onclick="clearStudents()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  清空
+                </button>
+              </div>
+            </div>
+            <div id="studentList" style="max-height:250px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            科目管理
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <input type="text" id="newSubject" class="input" placeholder="新科目...">
+            <button class="btn" style="padding:0 14px;background:#78350F;color:white" onclick="addSubject()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+          <div id="subjectTags" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部導航 -->
+    <div class="nav">
+      <button class="nav-item active" data-page="basic" onclick="switchPage('basic')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>點名</span>
+      </button>
+      <button class="nav-item" data-page="log" onclick="switchPage('log')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        <span>紀錄</span>
+      </button>
+      <button class="nav-item" data-page="review" onclick="switchPage('review')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        <span>日誌</span>
+      </button>
+      <button class="nav-item" data-page="report" onclick="switchPage('report')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M14 2v6h6"/></svg>
+        <span>報表</span>
+      </button>
+      <button class="nav-item" data-page="settings" onclick="switchPage('settings')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>設定</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="modal" onclick="closeModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3>點選學生</h3>
+        <button class="btn" style="width:40px;height:40px;padding:0;border-radius:50%" onclick="closeModal()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </button>
+      </div>
+      <div style="padding:8px 16px;background:#FEF3C7;font-weight:600;font-size:14px;border-bottom:2px solid #D97706">
+        正在登記：<span id="modalTitle"></span>
+      </div>
+      <div class="modal-body">
+        <div id="studentGrid" class="student-grid"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" style="width:100%;background:#CDF0EA" onclick="closeModal()">完 成</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==================== 資料 ====================
+    var db = {};
+    var students = [];
+    var subjects = [
+      {id:'chinese',label:'國文'},{id:'english',label:'英語'},{id:'math',label:'數學'},
+      {id:'science',label:'理化'},{id:'civics',label:'公民'},{id:'history',label:'歷史'},{id:'geo',label:'地理'}
+    ];
+    var behaviors = [
+      {id:'item_missing',label:'物品未帶',color:'#FFC4C4'},
+      {id:'late_class',label:'晚進教室',color:'#FDFD96'},
+      {id:'noise',label:'吵鬧干擾',color:'#FFC4C4'},
+      {id:'chat',label:'聊天',color:'#FDFD96'},
+      {id:'sleep',label:'打瞌睡',color:'#FFC4C4'},
+      {id:'no_hw',label:'作業未交',color:'#FFC4C4'},
+      {id:'other',label:'其他',color:'#C4E4FF'}
+    ];
+    var currentDate = '';
+    var currentPeriod = 'p1';
+    var hasChanges = false;
+    var modalType = '';
+    var modalCategory = '';
+
+    var ATTENDANCE = [
+      {id:'late',label:'遲到',color:'#FDFD96'},
+      {id:'sick',label:'病假',color:'#CDF0EA'},
+      {id:'official',label:'公假',color:'#C4E4FF'},
+      {id:'personal',label:'事假',color:'#E2C4FF'},
+      {id:'other_leave',label:'其他',color:'#E5E7EB'},
+      {id:'absent',label:'缺席',color:'#FFC4C4'}
+    ];
+
+    var CONTACT = [
+      {id:'cb_no_sign',label:'聯絡簿未簽',color:'#FFC4C4'},
+      {id:'cb_missing',label:'聯絡簿遲交',color:'#FDFD96'},
+      {id:'cb_good',label:'聯絡簿優良',color:'#CDF0EA'}
+    ];
+
+    var PERIODS = [
+      {id:'early',label:'早修'},{id:'p1',label:'第一節'},{id:'p2',label:'第二節'},
+      {id:'p3',label:'第三節'},{id:'p4',label:'第四節'},{id:'lunch',label:'午餐'},
+      {id:'nap',label:'午休'},{id:'p5',label:'第五節'},{id:'p6',label:'第六節'},
+      {id:'p7',label:'第七節'},{id:'p8',label:'第八節'}
+    ];
+
+    // ==================== 初始化 ====================
+    function init() {
+      // 初始化學生
+      students = [];
+      for (var i = 1; i <= 30; i++) {
+        students.push({id: i, name: i + '號'});
+      }
+
+      // 設定日期
+      var now = new Date();
+      currentDate = now.toISOString().split('T')[0];
+      document.getElementById('currentDate').value = currentDate;
+
+      // 週次選項 1-25
+      var weekSel = document.getElementById('weekNum');
+      for (var w = 1; w <= 25; w++) {
+        var opt = document.createElement('option');
+        opt.value = w;
+        opt.textContent = '第 ' + w + ' 週';
+        weekSel.appendChild(opt);
+      }
+
+      // 時段選項
+      var periodSel = document.getElementById('periodSelect');
+      PERIODS.forEach(function(p) {
+        var opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.label;
+        periodSel.appendChild(opt);
+      });
+
+      // 偵測裝置
+      var w = window.innerWidth;
+      var label = w < 640 ? '手機版' : w < 1024 ? '平板版' : '桌面版';
+      document.getElementById('deviceLabel').textContent = label;
+
+      renderAll();
+    }
+
+    // ==================== 開機/啟動 ====================
+    function startNew() {
+      document.getElementById('splash').classList.add('hide');
+      document.getElementById('app').style.display = 'block';
+      init();
+    }
+
+    function loadFile(e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          var data = JSON.parse(ev.target.result);
+          if (data.allData) db = data.allData;
+          if (data.settings) {
+            if (data.settings.students) students = data.settings.students;
+            if (data.settings.subjects) subjects = data.settings.subjects;
+            if (data.settings.behaviors) behaviors = data.settings.behaviors;
+            if (data.settings.teacherNote) document.getElementById('teacherNote').value = data.settings.teacherNote;
+          }
+          document.getElementById('splash').classList.add('hide');
+          document.getElementById('app').style.display = 'block';
+          init();
+          loadTodayData();
+          alert('✅ 載入成功！');
+        } catch (err) {
+          alert('❌ 檔案格式錯誤');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ==================== 頁面切換 ====================
+    function switchPage(page) {
+      document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+      document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+      document.getElementById('page-' + page).classList.add('active');
+      document.querySelector('.nav-item[data-page="' + page + '"]').classList.add('active');
+      
+      // 給 nav-item 設定背景色
+      var colors = {basic:'#CDF0EA',log:'#FDFD96',review:'#FFC4C4',report:'#C4E4FF',settings:'#FF5252'};
+      document.querySelectorAll('.nav-item').forEach(function(n) {
+        var p = n.getAttribute('data-page');
+        n.style.background = n.classList.contains('active') ? colors[p] : 'transparent';
+      });
+
+      if (page === 'review') renderReview();
+      if (page === 'report') updateReport();
+    }
+
+    // ==================== 渲染 ====================
+    function renderAll() {
+      renderStudentSelects();
+      renderAttendance();
+      renderContact();
+      renderSubjects();
+      renderBehaviors();
+      renderStudentList();
+      renderSubjectTags();
+      loadTodayData();
+    }
+
+    function renderStudentSelects() {
+      var selects = ['dutyOfficer', 'dutyStudent', 'reportStudent'];
+      selects.forEach(function(id) {
+        var sel = document.getElementById(id);
+        var val = sel.value;
+        sel.innerHTML = '<option value="">請選擇</option>';
+        students.forEach(function(s) {
+          var opt = document.createElement('option');
+          opt.value = s.name;
+          opt.textContent = s.id + '. ' + s.name;
+          sel.appendChild(opt);
+        });
+        sel.value = val;
+      });
+      // reportStudent 用 id
+      var rs = document.getElementById('reportStudent');
+      rs.innerHTML = '';
+      students.forEach(function(s) {
+        var opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.id + '. ' + s.name;
+        rs.appendChild(opt);
+      });
+    }
+
+    function renderAttendance() {
+      var html = '';
+      ATTENDANCE.forEach(function(a) {
+        var count = getTodayData().attendanceData[a.id] ? getTodayData().attendanceData[a.id].length : 0;
+        html += '<button class="item-btn" style="background:' + a.color + '" onclick="openModal(\'attendance\',\'' + a.id + '\',\'' + a.label + '\')">';
+        html += '<span class="item-btn-inner">' + a.label + '</span>';
+        if (count > 0) html += '<span class="count-badge">' + count + '</span>';
+        html += '</button>';
+      });
+      document.getElementById('attendanceList').innerHTML = html;
+    }
+
+    function renderContact() {
+      var html = '';
+      CONTACT.forEach(function(c) {
+        var count = getTodayData().missingData[c.id] ? getTodayData().missingData[c.id].length : 0;
+        html += '<button class="item-btn" style="background:' + c.color + '" onclick="openModal(\'missing\',\'' + c.id + '\',\'' + c.label + '\')">';
+        html += '<span class="item-btn-inner">' + c.label + '</span>';
+        if (count > 0) html += '<span class="count-badge">' + count + '</span>';
+        html += '</button>';
+      });
+      document.getElementById('contactList').innerHTML = html;
+    }
+
+    function renderSubjects() {
+      var sel = document.getElementById('subjectSelect');
+      sel.innerHTML = '';
+      subjects.forEach(function(s) {
+        var opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.label;
+        sel.appendChild(opt);
+      });
+      updateSubjectBtn();
+    }
+
+    function updateSubjectBtn() {
+      var subId = document.getElementById('subjectSelect').value;
+      var sub = subjects.find(function(s) { return s.id === subId; });
+      document.getElementById('subjectBtnLabel').textContent = '登記 ' + (sub ? sub.label : '') + ' 缺交';
+      var count = getTodayData().missingData[subId] ? getTodayData().missingData[subId].length : 0;
+      var badge = document.getElementById('subjectCount');
+      badge.textContent = count + ' 人';
+      badge.style.display = count > 0 ? 'inline' : 'none';
+    }
+
+    function renderBehaviors() {
+      var html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">';
+      behaviors.forEach(function(b) {
+        var pData = getTodayData().classLogData[currentPeriod] || {};
+        var count = pData[b.id] ? pData[b.id].length : 0;
+        html += '<button class="item-btn" style="background:' + b.color + ';flex-direction:column;min-height:70px;position:relative" onclick="openModal(\'log\',\'' + b.id + '\',\'' + b.label + '\')">';
+        html += '<span style="font-size:13px">' + b.label + '</span>';
+        if (count > 0) html += '<span style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;background:#EF4444;color:white;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;border:2px solid white">' + count + '</span>';
+        html += '</button>';
+      });
+      html += '</div>';
+      document.getElementById('behaviorList').innerHTML = html;
+    }
+
+    function renderStudentList() {
+      var html = '';
+      students.forEach(function(s, idx) {
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">';
+        html += '<span style="width:32px;font-weight:700;font-size:12px;color:#78350F">#' + s.id + '</span>';
+        html += '<input type="text" class="input" style="padding:8px;flex:1" value="' + s.name + '" onchange="updateStudentName(' + s.id + ',this.value)">';
+        html += '<button style="width:28px;height:28px;border:2px solid #EF4444;border-radius:8px;background:#FEE2E2;color:#EF4444;cursor:pointer;display:flex;align-items:center;justify-content:center" onclick="removeStudent(' + s.id + ')" title="刪除">';
+        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+        html += '</button>';
+        html += '</div>';
+      });
+      document.getElementById('studentList').innerHTML = html;
+      // 更新學生數量
+      var countEl = document.getElementById('studentCount');
+      if (countEl) countEl.textContent = students.length;
+    }
+
+    // 新增學生
+    function addNewStudent() {
+      var maxId = 0;
+      students.forEach(function(s) {
+        if (s.id > maxId) maxId = s.id;
+      });
+      var newId = maxId + 1;
+      var name = prompt('請輸入新學生姓名：', newId + '號');
+      if (name === null) return;
+      
+      students.push({id: newId, name: name.trim() || (newId + '號')});
+      hasChanges = true;
+      showSaveBtn();
+      renderAll();
+    }
+
+    // 刪除單一學生
+    function removeStudent(id) {
+      var s = students.find(function(x) { return x.id === id; });
+      if (!s) return;
+      if (!confirm('確定要刪除 #' + s.id + ' ' + s.name + '？')) return;
+      
+      students = students.filter(function(x) { return x.id !== id; });
+      hasChanges = true;
+      showSaveBtn();
+      renderAll();
+    }
+
+    function renderSubjectTags() {
+      var html = '';
+      subjects.forEach(function(s) {
+        html += '<span style="background:#F3F4F6;border:2px solid #78350F;border-radius:16px;padding:6px 12px;display:inline-flex;align-items:center;gap:6px;font-size:14px">';
+        html += s.label;
+        html += '<span style="cursor:pointer;opacity:0.5" onclick="removeSubject(\'' + s.id + '\')">&times;</span>';
+        html += '</span>';
+      });
+      document.getElementById('subjectTags').innerHTML = html;
+    }
+
+    // ==================== 資料操作 ====================
+    function getTodayData() {
+      if (!db[currentDate]) {
+        db[currentDate] = {
+          week: '', dutyOfficer: '', dutyStudent: '',
+          attendanceData: {}, missingData: {}, classLogData: {},
+          periodNotes: {}, incidentLog: ''
+        };
+      }
+      return db[currentDate];
+    }
+
+    function loadTodayData() {
+      var data = getTodayData();
+      document.getElementById('weekNum').value = data.week || '';
+      document.getElementById('dutyOfficer').value = data.dutyOfficer || '';
+      document.getElementById('dutyStudent').value = data.dutyStudent || '';
+      document.getElementById('incidentLog').value = data.incidentLog || '';
+      document.getElementById('periodNote').value = (data.periodNotes && data.periodNotes[currentPeriod]) || '';
+      renderAttendance();
+      renderContact();
+      updateSubjectBtn();
+      renderBehaviors();
+    }
+
+    function dateChanged() {
+      currentDate = document.getElementById('currentDate').value;
+      loadTodayData();
+    }
+
+    function periodChanged() {
+      currentPeriod = document.getElementById('periodSelect').value;
+      document.getElementById('periodNote').value = (getTodayData().periodNotes && getTodayData().periodNotes[currentPeriod]) || '';
+      renderBehaviors();
+    }
+
+    function saveField(field, value) {
+      getTodayData()[field] = value;
+      hasChanges = true;
+      showSaveBtn();
+      // 同步更新點名頁的下拉選單
+      if (field === 'week' && document.getElementById('weekNum')) {
+        document.getElementById('weekNum').value = value;
+      }
+      if (field === 'dutyOfficer' && document.getElementById('dutyOfficer')) {
+        document.getElementById('dutyOfficer').value = value;
+      }
+      if (field === 'dutyStudent' && document.getElementById('dutyStudent')) {
+        document.getElementById('dutyStudent').value = value;
+      }
+    }
+
+    function savePeriodNote() {
+      var data = getTodayData();
+      if (!data.periodNotes) data.periodNotes = {};
+      data.periodNotes[currentPeriod] = document.getElementById('periodNote').value;
+      hasChanges = true;
+      showSaveBtn();
+    }
+
+    function showSaveBtn() {
+      document.getElementById('saveBtn').style.display = hasChanges ? 'flex' : 'none';
+      document.getElementById('changesWarning').style.display = hasChanges ? 'block' : 'none';
+    }
+
+    // ==================== Modal ====================
+    function openModal(type, category, title) {
+      modalType = type;
+      modalCategory = category;
+      document.getElementById('modalTitle').textContent = title;
+      renderStudentGrid();
+      document.getElementById('modal').classList.add('show');
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('show');
+      renderAttendance();
+      renderContact();
+      updateSubjectBtn();
+      renderBehaviors();
+    }
+
+    function renderStudentGrid() {
+      var selected = getSelectedList();
+      var html = '';
+      students.forEach(function(s) {
+        var isSelected = selected.indexOf(s.id) > -1;
+        html += '<button class="student-btn ' + (isSelected ? 'selected' : '') + '" onclick="toggleStudent(' + s.id + ')">';
+        html += '<div style="font-size:11px;opacity:0.7">#' + s.id + '</div>';
+        html += '<div>' + s.name + '</div>';
+        html += '</button>';
+      });
+      document.getElementById('studentGrid').innerHTML = html;
+    }
+
+    function getSelectedList() {
+      var data = getTodayData();
+      if (modalType === 'attendance') {
+        return data.attendanceData[modalCategory] || [];
+      } else if (modalType === 'missing') {
+        return data.missingData[modalCategory] || [];
+      } else if (modalType === 'log') {
+        var pData = data.classLogData[currentPeriod] || {};
+        return pData[modalCategory] || [];
+      }
+      return [];
+    }
+
+    function toggleStudent(id) {
+      var data = getTodayData();
+      var list;
+      
+      if (modalType === 'attendance') {
+        if (!data.attendanceData[modalCategory]) data.attendanceData[modalCategory] = [];
+        list = data.attendanceData[modalCategory];
+      } else if (modalType === 'missing') {
+        if (!data.missingData[modalCategory]) data.missingData[modalCategory] = [];
+        list = data.missingData[modalCategory];
+      } else if (modalType === 'log') {
+        if (!data.classLogData[currentPeriod]) data.classLogData[currentPeriod] = {};
+        if (!data.classLogData[currentPeriod][modalCategory]) data.classLogData[currentPeriod][modalCategory] = [];
+        list = data.classLogData[currentPeriod][modalCategory];
+      }
+
+      var idx = list.indexOf(id);
+      if (idx > -1) {
+        list.splice(idx, 1);
+      } else {
+        list.push(id);
+      }
+      
+      hasChanges = true;
+      showSaveBtn();
+      renderStudentGrid();
+    }
+
+    function openMissingSubject() {
+      var subId = document.getElementById('subjectSelect').value;
+      var sub = subjects.find(function(s) { return s.id === subId; });
+      openModal('missing', subId, (sub ? sub.label : '') + '缺交');
+    }
+
+    // ==================== 日誌預覽 ====================
+    function renderReview() {
+      var data = getTodayData();
+      
+      // 週次下拉選單
+      var weekOptions = '<option value="">請選擇</option>';
+      for (var w = 1; w <= 25; w++) {
+        weekOptions += '<option value="' + w + '"' + (data.week == w ? ' selected' : '') + '>第 ' + w + ' 週</option>';
+      }
+      
+      // 學生下拉選單
+      var studentOptions = '<option value="">請選擇</option>';
+      students.forEach(function(s) {
+        studentOptions += '<option value="' + s.name + '">' + s.id + '. ' + s.name + '</option>';
+      });
+      
+      var officerOptions = studentOptions.replace('value="' + data.dutyOfficer + '"', 'value="' + data.dutyOfficer + '" selected');
+      var studentOpts = studentOptions.replace('value="' + data.dutyStudent + '"', 'value="' + data.dutyStudent + '" selected');
+      
+      var html = '<div style="text-align:center;margin-bottom:16px;padding-bottom:12px;border-bottom:3px solid #78350F">';
+      html += '<div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">';
+      html += '<select class="input" style="width:auto;font-size:18px;font-weight:700;padding:8px 36px 8px 12px" onchange="saveField(\'week\', this.value); renderReview();">' + weekOptions + '</select>';
+      html += '<span style="font-size:20px;font-weight:700">班級日誌</span>';
+      html += '<span style="font-size:16px;color:#78350F">(' + currentDate + ')</span>';
+      html += '</div>';
+      html += '</div>';
+      
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">';
+      html += '<div>';
+      html += '<label style="font-size:12px;font-weight:600;margin-bottom:4px;display:block">值日幹部</label>';
+      html += '<select class="input" onchange="saveField(\'dutyOfficer\', this.value)">' + officerOptions + '</select>';
+      html += '</div>';
+      html += '<div>';
+      html += '<label style="font-size:12px;font-weight:600;margin-bottom:4px;display:block">值日生</label>';
+      html += '<select class="input" onchange="saveField(\'dutyStudent\', this.value)">' + studentOpts + '</select>';
+      html += '</div>';
+      html += '</div>';
+
+      html += '<div style="background:#FEF3C7;border:2px solid #78350F;border-radius:12px;padding:12px;margin-bottom:12px">';
+      html += '<div style="font-weight:700;margin-bottom:8px">📋 缺勤</div>';
+      var hasAtt = false;
+      ATTENDANCE.forEach(function(a) {
+        var list = data.attendanceData[a.id] || [];
+        if (list.length > 0) {
+          hasAtt = true;
+          html += '<div style="padding:4px 0"><b>' + a.label + '：</b>' + list.map(function(id) {
+            var s = students.find(function(x) { return x.id === id; });
+            return s ? s.name : id;
+          }).join('、') + '</div>';
+        }
+      });
+      if (!hasAtt) html += '<div style="color:#92400E;opacity:0.7">全員出席 ✓</div>';
+      html += '</div>';
+
+      html += '<div style="background:#FEF3C7;border:2px solid #78350F;border-radius:12px;padding:12px">';
+      html += '<div style="font-weight:700;margin-bottom:8px">📚 缺交</div>';
+      var hasMiss = false;
+      CONTACT.forEach(function(c) {
+        var list = data.missingData[c.id] || [];
+        if (list.length > 0) {
+          hasMiss = true;
+          html += '<div style="padding:4px 0"><b>' + c.label + '：</b>' + list.map(function(id) {
+            var s = students.find(function(x) { return x.id === id; });
+            return s ? s.name : id;
+          }).join('、') + '</div>';
+        }
+      });
+      subjects.forEach(function(sub) {
+        var list = data.missingData[sub.id] || [];
+        if (list.length > 0) {
+          hasMiss = true;
+          html += '<div style="padding:4px 0"><b>' + sub.label + '：</b>' + list.map(function(id) {
+            var s = students.find(function(x) { return x.id === id; });
+            return s ? s.name : id;
+          }).join('、') + '</div>';
+        }
+      });
+      if (!hasMiss) html += '<div style="color:#92400E;opacity:0.7">全部繳交 ✓</div>';
+      html += '</div>';
+
+      document.getElementById('reviewContent').innerHTML = html;
+    }
+
+    // ==================== 報表 ====================
+    function getWeeklyStats(studentId) {
+      var dates = [];
+      var today = new Date(currentDate);
+      for (var i = 0; i < 5; i++) {
+        var d = new Date(today);
+        d.setDate(today.getDate() - i);
+        dates.push(d.toISOString().split('T')[0]);
+      }
+      
+      var stats = {attendance: {}, missing: {}};
+      var detailedAtt = [], detailedMiss = [];
+
+      dates.forEach(function(date) {
+        var data = db[date];
+        if (!data) return;
+        var ds = date.slice(5).replace('-', '/');
+        
+        if (data.attendanceData) {
+          Object.keys(data.attendanceData).forEach(function(k) {
+            if (data.attendanceData[k] && data.attendanceData[k].indexOf(studentId) > -1) {
+              stats.attendance[k] = (stats.attendance[k] || 0) + 1;
+              var t = ATTENDANCE.find(function(x) { return x.id === k; });
+              detailedAtt.push(ds + ' ' + (t ? t.label : k));
+            }
+          });
+        }
+        if (data.missingData) {
+          Object.keys(data.missingData).forEach(function(k) {
+            if (data.missingData[k] && data.missingData[k].indexOf(studentId) > -1) {
+              var sub = subjects.find(function(s) { return s.id === k; });
+              var cb = CONTACT.find(function(c) { return c.id === k; });
+              var label = sub ? sub.label + '缺交' : (cb ? cb.label : k);
+              stats.missing[label] = (stats.missing[label] || 0) + 1;
+              detailedMiss.push(ds + ' ' + label);
+            }
+          });
+        }
+      });
+      
+      return {dates: dates, stats: stats, detailedAtt: detailedAtt.reverse(), detailedMiss: detailedMiss.reverse()};
+    }
+
+    function generateMessage(studentId) {
+      var s = students.find(function(x) { return x.id === studentId; });
+      if (!s) return '';
+      
+      var result = getWeeklyStats(studentId);
+      var range = result.dates[result.dates.length-1].slice(5).replace('-','/') + ' ~ ' + result.dates[0].slice(5).replace('-','/');
+      
+      var teacherNote = document.getElementById('teacherNote').value;
+      var msg = teacherNote.trim() ? '📢 重要通知\n' + teacherNote + '\n\n' : '';
+      msg += '【班級週報】' + s.name + ' 本週 (' + range + ') 表現：\n\n';
+      msg += result.detailedAtt.length > 0 ? '📅 考勤：\n' + result.detailedAtt.map(function(i) { return '  - ' + i; }).join('\n') + '\n' : '📅 考勤：全勤 👍\n';
+      msg += result.detailedMiss.length > 0 ? '📚 作業：\n' + result.detailedMiss.map(function(i) { return '  - ' + i; }).join('\n') + '\n' : '📚 作業：良好 👍\n';
+      msg += '\n請協助關心孩子，謝謝！';
+      
+      return msg;
+    }
+
+    function updateReport() {
+      var studentId = parseInt(document.getElementById('reportStudent').value) || 1;
+      var result = getWeeklyStats(studentId);
+      
+      var attTotal = 0, missTotal = 0;
+      Object.keys(result.stats.attendance).forEach(function(k) { attTotal += result.stats.attendance[k]; });
+      Object.keys(result.stats.missing).forEach(function(k) { missTotal += result.stats.missing[k]; });
+      
+      document.getElementById('statAtt').textContent = attTotal;
+      document.getElementById('statMiss').textContent = missTotal;
+      document.getElementById('reportBox').textContent = generateMessage(studentId);
+    }
+
+    function shareLine() {
+      var studentId = parseInt(document.getElementById('reportStudent').value) || 1;
+      var msg = generateMessage(studentId);
+      var url = 'https://line.me/R/msg/text/?' + encodeURIComponent(msg);
+      window.location.href = url;
+    }
+
+    function copyReport() {
+      var studentId = parseInt(document.getElementById('reportStudent').value) || 1;
+      var msg = generateMessage(studentId);
+      
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(msg).then(function() {
+          alert('已複製到剪貼簿！');
+        });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = msg;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try {
+          document.execCommand('copy');
+          alert('已複製到剪貼簿！');
+        } catch (e) {
+          alert('複製失敗，請手動複製');
+        }
+        document.body.removeChild(ta);
+      }
+    }
+
+    // ==================== 匯出 ====================
+    function downloadCSV(content, filename) {
+      var blob = new Blob(['\uFEFF' + content], {type: 'text/csv;charset=utf-8;'});
+      var link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function exportDaily() {
+      var data = getTodayData();
+      var csv = '班級日誌\n日期,' + currentDate + '\n週次,' + data.week + '\n\n【缺勤】\n';
+      ATTENDANCE.forEach(function(a) {
+        var list = data.attendanceData[a.id] || [];
+        if (list.length > 0) {
+          csv += a.label + ',' + list.map(function(id) {
+            var s = students.find(function(x) { return x.id === id; });
+            return s ? s.name : id;
+          }).join('、') + '\n';
+        }
+      });
+      downloadCSV(csv, '班級日誌_' + currentDate + '.csv');
+    }
+
+    function exportWeekly() {
+      var dates = [];
+      var today = new Date(currentDate);
+      for (var i = 0; i < 5; i++) {
+        var d = new Date(today);
+        d.setDate(today.getDate() - i);
+        dates.push(d.toISOString().split('T')[0]);
+      }
+      
+      var csv = '全班週報表\n統計範圍,' + dates[dates.length-1] + ' ~ ' + dates[0] + '\n\n座號,姓名,缺勤,缺交\n';
+      students.forEach(function(s) {
+        var result = getWeeklyStats(s.id);
+        var att = 0, miss = 0;
+        Object.keys(result.stats.attendance).forEach(function(k) { att += result.stats.attendance[k]; });
+        Object.keys(result.stats.missing).forEach(function(k) { miss += result.stats.missing[k]; });
+        csv += s.id + ',' + s.name + ',' + att + ',' + miss + '\n';
+      });
+      
+      downloadCSV(csv, '全班週報表_' + currentDate + '.csv');
+    }
+
+    // ==================== 儲存/載入 ====================
+    function saveData() {
+      var data = {
+        version: '15.0',
+        timestamp: new Date().toISOString(),
+        allData: db,
+        settings: {
+          subjects: subjects,
+          behaviors: behaviors,
+          students: students,
+          teacherNote: document.getElementById('teacherNote').value
+        }
+      };
+      
+      var json = JSON.stringify(data, null, 2);
+      var blob = new Blob([json], {type: 'application/json'});
+      var link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = '班級日誌_備份_' + currentDate + '.json';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      hasChanges = false;
+      showSaveBtn();
+      alert('✅ 備份檔已下載！');
+    }
+
+    // ==================== 設定 ====================
+    function updateStudentName(id, name) {
+      var s = students.find(function(x) { return x.id === id; });
+      if (s) {
+        s.name = name;
+        hasChanges = true;
+        showSaveBtn();
+        renderStudentSelects();
+      }
+    }
+
+    // ==================== 外部檔案匯入 ====================
+    function importStudentFile(event) {
+      var file = event.target.files && event.target.files[0];
+      if (!file) return;
+      
+      var ext = file.name.split('.').pop().toLowerCase();
+      var reader = new FileReader();
+      
+      // 顯示載入中
+      var loadingMsg = '正在解析 ' + file.name + '...';
+      
+      if (ext === 'csv' || ext === 'txt') {
+        reader.onload = function(e) {
+          var text = e.target.result;
+          parseCSVData(text);
+        };
+        reader.readAsText(file);
+      } 
+      else if (ext === 'xlsx' || ext === 'xls') {
+        reader.onload = function(e) {
+          try {
+            var data = new Uint8Array(e.target.result);
+            var workbook = XLSX.read(data, {type: 'array'});
+            var firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            var jsonData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+            parseArrayData(jsonData);
+          } catch (err) {
+            alert('❌ Excel 檔案解析失敗：' + err.message);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      }
+      else if (ext === 'docx' || ext === 'doc') {
+        reader.onload = function(e) {
+          mammoth.extractRawText({arrayBuffer: e.target.result})
+            .then(function(result) {
+              parseTextData(result.value);
+            })
+            .catch(function(err) {
+              alert('❌ Word 檔案解析失敗：' + err.message);
+            });
+        };
+        reader.readAsArrayBuffer(file);
+      }
+      else if (ext === 'pdf') {
+        reader.onload = function(e) {
+          var typedArray = new Uint8Array(e.target.result);
+          pdfjsLib.getDocument(typedArray).promise.then(function(pdf) {
+            var textPromises = [];
+            for (var i = 1; i <= pdf.numPages; i++) {
+              textPromises.push(
+                pdf.getPage(i).then(function(page) {
+                  return page.getTextContent().then(function(textContent) {
+                    return textContent.items.map(function(item) { return item.str; }).join(' ');
+                  });
+                })
+              );
+            }
+            Promise.all(textPromises).then(function(texts) {
+              parseTextData(texts.join('\n'));
+            });
+          }).catch(function(err) {
+            alert('❌ PDF 檔案解析失敗：' + err.message);
+          });
+        };
+        reader.readAsArrayBuffer(file);
+      }
+      else {
+        alert('❌ 不支援的檔案格式：' + ext);
+      }
+      
+      // 清空檔案選擇
+      event.target.value = '';
+    }
+
+    // 解析 CSV 格式資料
+    function parseCSVData(text) {
+      var lines = text.split(/\r?\n/).filter(function(l) { return l.trim(); });
+      if (lines.length < 2) {
+        alert('❌ 檔案內容不足，至少需要標頭列和一筆資料');
+        return;
+      }
+      
+      // 解析標頭
+      var header = lines[0].split(/[,\t;]/).map(function(h) { return h.trim().replace(/["']/g, ''); });
+      var nameIdx = findColumnIndex(header, ['姓名', '名字', 'name', '學生姓名', '學生']);
+      var idIdx = findColumnIndex(header, ['座號', '學號', 'id', '號碼', '編號', 'no']);
+      
+      if (nameIdx === -1) {
+        alert('❌ 找不到「姓名」欄位，請確認標頭包含：座號、姓名');
+        return;
+      }
+      
+      // 解析資料（跳過標頭）
+      var parsed = [];
+      for (var i = 1; i < lines.length; i++) {
+        var cols = lines[i].split(/[,\t;]/).map(function(c) { return c.trim().replace(/["']/g, ''); });
+        var name = cols[nameIdx];
+        if (name) {
+          var id = idIdx !== -1 && cols[idIdx] ? parseInt(cols[idIdx]) : (parsed.length + 1);
+          parsed.push({id: id || (parsed.length + 1), name: name});
+        }
+      }
+      
+      applyStudentData(parsed);
+    }
+
+    // 解析二維陣列資料 (Excel)
+    function parseArrayData(data) {
+      if (data.length < 2) {
+        alert('❌ 檔案內容不足，至少需要標頭列和一筆資料');
+        return;
+      }
+      
+      // 解析標頭
+      var header = data[0].map(function(h) { return String(h || '').trim(); });
+      var nameIdx = findColumnIndex(header, ['姓名', '名字', 'name', '學生姓名', '學生']);
+      var idIdx = findColumnIndex(header, ['座號', '學號', 'id', '號碼', '編號', 'no']);
+      
+      if (nameIdx === -1) {
+        alert('❌ 找不到「姓名」欄位，請確認標頭包含：座號、姓名');
+        return;
+      }
+      
+      // 解析資料（跳過標頭）
+      var parsed = [];
+      for (var i = 1; i < data.length; i++) {
+        var row = data[i];
+        if (!row || row.length === 0) continue;
+        var name = row[nameIdx] ? String(row[nameIdx]).trim() : '';
+        if (name) {
+          var id = idIdx !== -1 && row[idIdx] ? parseInt(row[idIdx]) : (parsed.length + 1);
+          parsed.push({id: id || (parsed.length + 1), name: name});
+        }
+      }
+      
+      applyStudentData(parsed);
+    }
+
+    // 解析純文字資料 (Word, PDF)
+    function parseTextData(text) {
+      // 嘗試找表格格式
+      var lines = text.split(/\r?\n/).filter(function(l) { return l.trim(); });
+      
+      // 先嘗試用 CSV 格式解析
+      var hasComma = lines.some(function(l) { return l.indexOf(',') > -1 || l.indexOf('\t') > -1; });
+      if (hasComma) {
+        parseCSVData(text);
+        return;
+      }
+      
+      // 嘗試找數字+名字的格式 (如 "1 王小明" 或 "1. 王小明")
+      var parsed = [];
+      var foundHeader = false;
+      
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        
+        // 跳過標頭行
+        if (!foundHeader && (line.indexOf('座號') > -1 || line.indexOf('姓名') > -1 || line.toLowerCase().indexOf('name') > -1)) {
+          foundHeader = true;
+          continue;
+        }
+        
+        // 嘗試匹配 "數字 名字" 格式
+        var match = line.match(/^(\d+)[.\s、]+(.+)$/);
+        if (match) {
+          parsed.push({id: parseInt(match[1]), name: match[2].trim()});
+        } else if (line && !line.match(/^[\d\s.\-]+$/) && line.length < 20) {
+          // 純名字
+          parsed.push({id: parsed.length + 1, name: line});
+        }
+      }
+      
+      if (parsed.length === 0) {
+        alert('❌ 無法從檔案中解析出學生名單，請確認格式正確');
+        return;
+      }
+      
+      applyStudentData(parsed);
+    }
+
+    // 尋找欄位索引
+    function findColumnIndex(header, keywords) {
+      for (var i = 0; i < header.length; i++) {
+        var h = header[i].toLowerCase();
+        for (var j = 0; j < keywords.length; j++) {
+          if (h.indexOf(keywords[j].toLowerCase()) > -1) {
+            return i;
+          }
+        }
+      }
+      return -1;
+    }
+
+    // 套用學生資料
+    function applyStudentData(data) {
+      if (data.length === 0) {
+        alert('❌ 沒有找到有效的學生資料');
+        return;
+      }
+      
+      // 排序並重新編號
+      data.sort(function(a, b) { return a.id - b.id; });
+      
+      // 預覽確認
+      var preview = data.slice(0, 5).map(function(s) { return s.id + '. ' + s.name; }).join('\n');
+      if (data.length > 5) preview += '\n... 共 ' + data.length + ' 位學生';
+      
+      if (!confirm('找到 ' + data.length + ' 位學生：\n\n' + preview + '\n\n確定匯入？')) {
+        return;
+      }
+      
+      students = data;
+      hasChanges = true;
+      showSaveBtn();
+      renderAll();
+      alert('✅ 成功匯入 ' + data.length + ' 位學生！');
+    }
+
+    // 清空學生名單
+    function clearStudents() {
+      var choice = confirm('確定要清空所有學生名單？\n\n點「確定」= 完全清空\n點「取消」= 保留名單');
+      if (!choice) return;
+      
+      var resetDefault = confirm('是否重置為預設 1-30 號？\n\n點「確定」= 重置為 30 人\n點「取消」= 完全清空');
+      
+      if (resetDefault) {
+        students = [];
+        for (var i = 1; i <= 30; i++) {
+          students.push({id: i, name: i + '號'});
+        }
+      } else {
+        students = [];
+      }
+      
+      hasChanges = true;
+      showSaveBtn();
+      renderAll();
+    }
+
+    function importStudents() {
+      var text = document.getElementById('bulkNames').value;
+      if (!text.trim()) return;
+      
+      var names = text.split('\n').map(function(n) { return n.trim(); }).filter(function(n) { return n; });
+      if (!confirm('匯入 ' + names.length + ' 位學生？')) return;
+      
+      students = names.map(function(name, i) {
+        return {id: i + 1, name: name};
+      });
+      
+      document.getElementById('bulkNames').value = '';
+      hasChanges = true;
+      showSaveBtn();
+      renderAll();
+      alert('✅ 匯入成功！');
+    }
+
+    function addSubject() {
+      var name = document.getElementById('newSubject').value.trim();
+      if (!name) return;
+      
+      subjects.push({id: 's' + Date.now(), label: name});
+      document.getElementById('newSubject').value = '';
+      hasChanges = true;
+      showSaveBtn();
+      renderSubjects();
+      renderSubjectTags();
+    }
+
+    function removeSubject(id) {
+      subjects = subjects.filter(function(s) { return s.id !== id; });
+      hasChanges = true;
+      showSaveBtn();
+      renderSubjects();
+      renderSubjectTags();
+    }
+
+    // ==================== 啟動 ====================
+    document.addEventListener('DOMContentLoaded', function() {
+      // 偵測裝置並顯示
+      var w = window.innerWidth;
+      var label = w < 640 ? '手機版' : w < 1024 ? '平板版' : '桌面版';
+      document.getElementById('deviceLabel').textContent = label;
+    });
+  </script>
+</body>
+</html>
